@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+adaptive_math.db
+*.db-journal
+.streamlit/secrets.toml

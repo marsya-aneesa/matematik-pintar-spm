@@ -1,0 +1,118 @@
+{
+  "final_model": "Profile-Aware Hybrid RF-DNN",
+  "include_exam_score": false,
+  "feature_cols": [
+    "StudyHours",
+    "Attendance",
+    "Age",
+    "OnlineCourses",
+    "AssignmentCompletion",
+    "Resources",
+    "Extracurricular",
+    "Motivation",
+    "Internet",
+    "Gender",
+    "LearningStyle",
+    "Discussions",
+    "EduTech",
+    "StressLevel"
+  ],
+  "numeric_features": [
+    "StudyHours",
+    "Attendance",
+    "Age",
+    "OnlineCourses",
+    "AssignmentCompletion"
+  ],
+  "categorical_features": [
+    "Resources",
+    "Extracurricular",
+    "Motivation",
+    "Internet",
+    "Gender",
+    "LearningStyle",
+    "Discussions",
+    "EduTech",
+    "StressLevel"
+  ],
+  "level_encoding": {
+    "Rendah": 0,
+    "Sederhana": 1,
+    "Tinggi": 2
+  },
+  "level_decoding": {
+    "0": "Rendah",
+    "1": "Sederhana",
+    "2": "Tinggi"
+  },
+  "best_rf_params": {
+    "n_estimators": 500,
+    "min_samples_split": 5,
+    "min_samples_leaf": 1,
+    "max_features": null,
+    "max_depth": null
+  },
+  "best_hybrid_architecture": "(256, 128, 64)",
+  "best_hybrid_config": {
+    "arch": [
+      256,
+      128,
+      64
+    ],
+    "alpha": 0.0001,
+    "lr": 0.0005,
+    "batch": 128
+  },
+  "best_hybrid_validation_f1": 0.878361194773251,
+  "results": [
+    {
+      "Dataset": "Validation",
+      "Model": "Random Forest",
+      "Accuracy": 0.871692060946271,
+      "Precision": 0.8812963526256119,
+      "Recall": 0.871692060946271,
+      "F1": 0.8696941640136454
+    },
+    {
+      "Dataset": "Validation",
+      "Model": "Direct DNN/MLP",
+      "Accuracy": 0.5854049719326383,
+      "Precision": 0.5902342746858316,
+      "Recall": 0.5854049719326383,
+      "F1": 0.5872144892201713
+    },
+    {
+      "Dataset": "Validation",
+      "Model": "Profile-Aware Hybrid RF-DNN",
+      "Accuracy": 0.8789093825180433,
+      "Precision": 0.8788581626454337,
+      "Recall": 0.8789093825180433,
+      "F1": 0.878361194773251
+    },
+    {
+      "Dataset": "Test",
+      "Model": "Random Forest",
+      "Accuracy": 0.8644747393744988,
+      "Precision": 0.8708299489747111,
+      "Recall": 0.8644747393744988,
+      "F1": 0.8629413059202797
+    },
+    {
+      "Dataset": "Test",
+      "Model": "Direct DNN/MLP",
+      "Accuracy": 0.5805934242181235,
+      "Precision": 0.5844942140077585,
+      "Recall": 0.5805934242181235,
+      "F1": 0.582178156922083
+    },
+    {
+      "Dataset": "Test",
+      "Model": "Profile-Aware Hybrid RF-DNN",
+      "Accuracy": 0.8660785886126704,
+      "Precision": 0.8658994303168706,
+      "Recall": 0.8660785886126704,
+      "F1": 0.8658841774949587
+    }
+  ],
+  "feature_note": "ExamScore is excluded from final model training after checking its strong relationship with FinalGrade."
+}
