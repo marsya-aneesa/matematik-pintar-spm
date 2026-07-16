@@ -1242,9 +1242,8 @@ def app_topbar(section_title):
         ("Papan Pemuka", "Papan Pemuka"),
         ("Kuiz Adaptif", "Kuiz Adaptif"),
         ("Laporan Prestasi", "Laporan Prestasi"),
-        ("Pangkalan Data", "Rekod Pembelajaran"),
     ]
-    nav_cols = st.columns(5, gap="small")
+    nav_cols = st.columns(4, gap="small")
     current_page = st.session_state.get("nav_page", "Profil")
     safe_section = section_title.replace(" ", "_").replace("&", "dan").lower()
     for col, (page_name, label) in zip(nav_cols, pages):
@@ -1840,9 +1839,6 @@ def page_dashboard():
         st.markdown('<div class="v43-side-actions">', unsafe_allow_html=True)
         if st.button("Laporan Prestasi", key="dashboard_go_report", use_container_width=True):
             go_to("Laporan Prestasi")
-            st.rerun()
-        if st.button("Rekod Pembelajaran", key="dashboard_go_database", use_container_width=True):
-            go_to("Pangkalan Data")
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
