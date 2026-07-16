@@ -1,118 +1,147 @@
 {
-  "final_model": "Profile-Aware Hybrid RF-DNN",
-  "include_exam_score": false,
-  "feature_cols": [
-    "StudyHours",
-    "Attendance",
-    "Age",
-    "OnlineCourses",
-    "AssignmentCompletion",
-    "Resources",
-    "Extracurricular",
-    "Motivation",
-    "Internet",
-    "Gender",
-    "LearningStyle",
-    "Discussions",
-    "EduTech",
-    "StressLevel"
-  ],
-  "numeric_features": [
-    "StudyHours",
-    "Attendance",
-    "Age",
-    "OnlineCourses",
-    "AssignmentCompletion"
-  ],
-  "categorical_features": [
-    "Resources",
-    "Extracurricular",
-    "Motivation",
-    "Internet",
-    "Gender",
-    "LearningStyle",
-    "Discussions",
-    "EduTech",
-    "StressLevel"
-  ],
-  "level_encoding": {
-    "Rendah": 0,
-    "Sederhana": 1,
-    "Tinggi": 2
+  "test": {
+    "accuracy": 0.8973536487570168
   },
-  "level_decoding": {
-    "0": "Rendah",
-    "1": "Sederhana",
-    "2": "Tinggi"
-  },
-  "best_rf_params": {
-    "n_estimators": 500,
-    "min_samples_split": 5,
-    "min_samples_leaf": 1,
-    "max_features": null,
-    "max_depth": null
-  },
-  "best_hybrid_architecture": "(256, 128, 64)",
-  "best_hybrid_config": {
-    "arch": [
-      256,
-      128,
-      64
+  "summary": {
+    "final_model": "Hybrid RF-DNN",
+    "feature_cols": [
+      "StudyHours",
+      "Attendance",
+      "Age",
+      "OnlineCourses",
+      "AssignmentCompletion",
+      "Resources",
+      "Extracurricular",
+      "Motivation",
+      "Internet",
+      "Gender",
+      "LearningStyle",
+      "Discussions",
+      "EduTech",
+      "StressLevel",
+      "ExamBand"
     ],
-    "alpha": 0.0001,
-    "lr": 0.0005,
-    "batch": 128
-  },
-  "best_hybrid_validation_f1": 0.878361194773251,
-  "results": [
-    {
-      "Dataset": "Validation",
-      "Model": "Random Forest",
-      "Accuracy": 0.871692060946271,
-      "Precision": 0.8812963526256119,
-      "Recall": 0.871692060946271,
-      "F1": 0.8696941640136454
+    "results": [
+      {
+        "Dataset": "Validation",
+        "Model": "Random Forest",
+        "Accuracy": 0.8444266238973537,
+        "Precision": 0.8825575854486608,
+        "Recall": 0.8444266238973537,
+        "F1": 0.8408432144492903
+      },
+      {
+        "Dataset": "Validation",
+        "Model": "Direct DNN/MLP",
+        "Accuracy": 0.8821170809943866,
+        "Precision": 0.8834461034859863,
+        "Recall": 0.8821170809943866,
+        "F1": 0.8820738322103754
+      },
+      {
+        "Dataset": "Validation",
+        "Model": "Hybrid RF-DNN",
+        "Accuracy": 0.8949478748997595,
+        "Precision": 0.8945614387661371,
+        "Recall": 0.8949478748997595,
+        "F1": 0.8946488024108024
+      },
+      {
+        "Dataset": "Test",
+        "Model": "Random Forest",
+        "Accuracy": 0.8259823576583801,
+        "Precision": 0.8712638051559849,
+        "Recall": 0.8259823576583801,
+        "F1": 0.8204300364018664
+      },
+      {
+        "Dataset": "Test",
+        "Model": "Direct DNN/MLP",
+        "Accuracy": 0.8813151563753007,
+        "Precision": 0.8842784826113926,
+        "Recall": 0.8813151563753007,
+        "F1": 0.881058971226885
+      },
+      {
+        "Dataset": "Test",
+        "Model": "Hybrid RF-DNN",
+        "Accuracy": 0.8973536487570168,
+        "Precision": 0.8979053083104149,
+        "Recall": 0.8973536487570168,
+        "F1": 0.897308656286639
+      }
+    ],
+    "rf_cv_f1_mean": 0.8261047293127483,
+    "rf_cv_f1_std": 0.005021748876994663,
+    "confusion_matrix_test_hybrid": [
+      [
+        262,
+        29,
+        0
+      ],
+      [
+        29,
+        542,
+        45
+      ],
+      [
+        0,
+        25,
+        315
+      ]
+    ],
+    "classification_report_test_hybrid": "              precision    recall  f1-score   support\n\n      Rendah       0.90      0.90      0.90       291\n   Sederhana       0.91      0.88      0.89       616\n      Tinggi       0.88      0.93      0.90       340\n\n    accuracy                           0.90      1247\n   macro avg       0.89      0.90      0.90      1247\nweighted avg       0.90      0.90      0.90      1247\n",
+    "target_distribution": {
+      "Rendah": 2904,
+      "Sederhana": 6164,
+      "Tinggi": 3401
     },
-    {
-      "Dataset": "Validation",
-      "Model": "Direct DNN/MLP",
-      "Accuracy": 0.5854049719326383,
-      "Precision": 0.5902342746858316,
-      "Recall": 0.5854049719326383,
-      "F1": 0.5872144892201713
+    "feature_audit": {
+      "exam_score_finalgrade_correlation": -0.9683649870238384,
+      "overlapping_exam_scores": 0
     },
-    {
-      "Dataset": "Validation",
-      "Model": "Profile-Aware Hybrid RF-DNN",
-      "Accuracy": 0.8789093825180433,
-      "Precision": 0.8788581626454337,
-      "Recall": 0.8789093825180433,
-      "F1": 0.878361194773251
-    },
-    {
-      "Dataset": "Test",
-      "Model": "Random Forest",
-      "Accuracy": 0.8644747393744988,
-      "Precision": 0.8708299489747111,
-      "Recall": 0.8644747393744988,
-      "F1": 0.8629413059202797
-    },
-    {
-      "Dataset": "Test",
-      "Model": "Direct DNN/MLP",
-      "Accuracy": 0.5805934242181235,
-      "Precision": 0.5844942140077585,
-      "Recall": 0.5805934242181235,
-      "F1": 0.582178156922083
-    },
-    {
-      "Dataset": "Test",
-      "Model": "Profile-Aware Hybrid RF-DNN",
-      "Accuracy": 0.8660785886126704,
-      "Precision": 0.8658994303168706,
-      "Recall": 0.8660785886126704,
-      "F1": 0.8658841774949587
-    }
-  ],
-  "feature_note": "ExamScore is excluded from final model training after checking its strong relationship with FinalGrade."
+    "calibration_note": "hybrid_model is a CalibratedClassifierCV (sigmoid) wrapping the tuned MLP, fit on the validation split, because the raw MLP softmax output was badly overconfident.",
+    "shap_global_importance_top10": [
+      {
+        "Feature": "RF_prob_Tinggi",
+        "MeanAbsSHAP": 0.11139309067477311
+      },
+      {
+        "Feature": "RF_prob_Sederhana",
+        "MeanAbsSHAP": 0.0645531061206061
+      },
+      {
+        "Feature": "cat__ExamBand_3",
+        "MeanAbsSHAP": 0.055356755021979905
+      },
+      {
+        "Feature": "RF_prob_Rendah",
+        "MeanAbsSHAP": 0.05353464370551076
+      },
+      {
+        "Feature": "cat__ExamBand_1",
+        "MeanAbsSHAP": 0.04338883458066982
+      },
+      {
+        "Feature": "cat__ExamBand_2",
+        "MeanAbsSHAP": 0.02613209153136864
+      },
+      {
+        "Feature": "num__AssignmentCompletion",
+        "MeanAbsSHAP": 0.013733608103516466
+      },
+      {
+        "Feature": "num__Attendance",
+        "MeanAbsSHAP": 0.01239268706106399
+      },
+      {
+        "Feature": "cat__Gender_0",
+        "MeanAbsSHAP": 0.011560130966670778
+      },
+      {
+        "Feature": "cat__Gender_1",
+        "MeanAbsSHAP": 0.01150625222365643
+      }
+    ]
+  }
 }

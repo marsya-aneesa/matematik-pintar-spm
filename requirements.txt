@@ -1,10 +1,11 @@
 streamlit
 pandas
 numpy
-scikit-learn==1.7.0
+scikit-learn==1.6.1
 imbalanced-learn
 joblib
 matplotlib
 openpyxl
 scipy
 openai
+shap

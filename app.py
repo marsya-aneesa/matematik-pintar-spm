@@ -1,7 +1,6 @@
 # ============================================================
 # app.py
 # Sistem Pembelajaran Adaptif Matematik Tingkatan 4 dan 5
-# Versi 35: aras semasa dashboard ikut aras akhir/adaptif terkini
 # ============================================================
 
 import os
@@ -10,6 +9,8 @@ import math
 import random
 import sqlite3
 import html
+import json
+import textwrap
 from pathlib import Path
 
 import joblib
@@ -28,387 +29,96 @@ from database import (
 
 APP_TITLE = "Matematik Pintar SPM"
 DATA_DIR = Path("data")
-MODEL_PATH = Path("models") / "hybrid_rf_dnn_bundle.pkl"
 QUESTION_PATH = DATA_DIR / "Bank Soalan.xlsx"
 LEVEL_TEXT = {0: "Rendah", 1: "Sederhana", 2: "Tinggi"}
-LEVEL_COLOR = {0: "#38bdf8", 1: "#2563eb", 2: "#14b8a6"}
-LEVEL_LIGHT = {0: "#ecfeff", 1: "#eff6ff", 2: "#ecfdf5"}
+LEVEL_COLOR = {0: "#7FA8F0", 1: "#1A56DB", 2: "#F2994A"}
+LEVEL_LIGHT = {0: "#EAF1FF", 1: "#D6E4FF", 2: "#FFE3C2"}
+LEVEL_TEXT_ON_COLOR = {0: "#001B4D", 1: "#FFFFFF", 2: "#7A3B00"}
+TUTOR_MARK_SVG = (
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">'
+    '<polygon points="12,2.5 21,7.5 21,16.5 12,21.5 3,16.5 3,7.5" stroke="currentColor" stroke-width="1.7"/>'
+    '<circle cx="12" cy="12" r="2.3" fill="currentColor"/>'
+    '</svg>'
+)
+LOGO_MARK_SVG = (
+    '<svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">'
+    '<path d="M4 16 L9 21 L15 6 H27" stroke="#FFFFFF" stroke-width="2.6" '
+    'stroke-linecap="round" stroke-linejoin="round"/>'
+    '</svg>'
+)
 
-st.set_page_config(page_title=APP_TITLE, page_icon="📘", layout="wide", initial_sidebar_state="collapsed")
+ASSETS_DIR = Path("assets")
+_LOGO_CANDIDATES = [ASSETS_DIR / f"logo.{ext}" for ext in ("svg", "png", "jpg", "jpeg", "webp")]
+LOGO_PATH = next((p for p in _LOGO_CANDIDATES if p.exists()), None)
 
-# ------------------------------------------------------------
-# CSS GAYA PREMIUM: Biru moden dan hijau petunjuk 
-# ------------------------------------------------------------
+st.set_page_config(page_title=APP_TITLE, page_icon=None, layout="wide", initial_sidebar_state="collapsed")
+
+
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap');
 
 :root{
-    --biru-gelap:#082f49;
-    --biru:#2563eb;
-    --biru-muda:#38bdf8;
-    --hijau:#14b8a6;
-    --hijau-muda:#ccfbf1;
-    --latar:#f4fbff;
-    --kad:#ffffff;
-    --teks:#0f172a;
-    --teks-lembut:#475569;
-    --garis:#dbeafe;
-    --bayang:0 22px 60px rgba(15, 23, 42, .10);
+    --primary:#1A56DB;
+    --primary-hover:#1447B8;
+    --primary-deep:#0B2E6B;
+    --primary-deep-soft:#123B82;
+    --on-primary:#FFFFFF;
+    --primary-container:#D6E4FF;
+    --on-primary-container:#001B4D;
+
+    --accent:#F2994A;
+    --accent-hover:#C97A2E;
+    --accent-container:#FFE3C2;
+    --on-accent:#7A3B00;
+
+    --surface:#E6ECFA;
+    --surface-card:#FFFFFF;
+    --surface-alt:#E2EAFB;
+    --on-surface:#10193A;
+    --on-surface-variant:#4A5578;
+    --outline:#C6D2EE;
+    --outline-strong:#98A9D6;
+
+    --success-bg:#DCF3E0;--on-success:#0C5323;
+    --warning-bg:#FBE7D0;--on-warning:#7A4A12;
+
+    --shadow-sm:0 1px 2px rgba(11,17,45,.06),0 1px 1px rgba(11,17,45,.04);
+    --shadow-md:0 8px 24px rgba(11,17,45,.10);
+    --shadow-lg:0 20px 48px rgba(11,17,45,.16);
+    --radius-lg:20px;--radius-md:14px;--radius-sm:10px;
+    --sans:'Manrope',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+
+    /* internal aliases so the rest of this stylesheet reads consistently */
+    --ink:var(--primary-deep);
+    --ink-soft:var(--primary-deep-soft);
+
+    --blueprint:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M240 0H0V240' fill='none' stroke='%23BFD6FF' stroke-opacity='0.35' stroke-width='1'/%3E%3Ccircle cx='36' cy='196' r='30' fill='none' stroke='%23BFD6FF' stroke-opacity='0.45' stroke-width='1.2'/%3E%3Cpath d='M160 26 A48 48 0 0 1 208 74' fill='none' stroke='%23BFD6FF' stroke-opacity='0.5' stroke-width='1.2'/%3E%3Cline x1='140' y1='140' x2='198' y2='140' stroke='%23BFD6FF' stroke-opacity='0.4' stroke-width='1'/%3E%3Cline x1='169' y1='111' x2='169' y2='169' stroke='%23BFD6FF' stroke-opacity='0.4' stroke-width='1'/%3E%3C/svg%3E");
+    --page-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cpath d='M140 0H0V140' fill='none' stroke='%231A56DB' stroke-opacity='0.08' stroke-width='1'/%3E%3Ccircle cx='20' cy='120' r='16' fill='none' stroke='%231A56DB' stroke-opacity='0.10' stroke-width='1'/%3E%3Cpath d='M92 18 A22 22 0 0 1 114 40' fill='none' stroke='%231A56DB' stroke-opacity='0.10' stroke-width='1'/%3E%3C/svg%3E");
 }
 
+/* ------------------------------------------------------------
+   Base
+------------------------------------------------------------ */
 html, body, [class*="css"]{
-    font-family:'Inter', sans-serif !important;
-    color:var(--teks) !important;
+    font-family:var(--sans) !important;
+    color:var(--on-surface) !important;
 }
-
 .stApp{
-    background:
-        radial-gradient(circle at 8% 10%, rgba(56,189,248,.26), transparent 28%),
-        radial-gradient(circle at 88% 12%, rgba(20,184,166,.20), transparent 30%),
-        radial-gradient(circle at 50% 100%, rgba(37,99,235,.12), transparent 45%),
-        linear-gradient(135deg,#f8fdff 0%,#eef7ff 42%,#f1fffb 100%) !important;
-    background-attachment: fixed !important;
+    background-color:var(--surface) !important;
+    background-image:var(--page-pattern) !important;
+    background-repeat:repeat !important;
+    background-attachment:fixed !important;
 }
-
 .block-container{
-    max-width:1210px !important;
+    max-width:1180px !important;
     padding-top:1.1rem !important;
     padding-bottom:4rem !important;
 }
-
 #MainMenu, footer, header {visibility:hidden;}
+[data-testid="stDecoration"]{display:none !important;}
 
-/* Bar sistem */
-.v12-topbar{
-    position: sticky;
-    top: .75rem;
-    z-index: 10;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:1rem;
-    background:rgba(255,255,255,.86);
-    border:1px solid rgba(147,197,253,.55);
-    border-radius:26px;
-    padding:16px 20px;
-    box-shadow:0 18px 45px rgba(15,23,42,.08);
-    backdrop-filter:blur(18px);
-    margin-bottom:16px;
-}
-.v12-brand{display:flex;align-items:center;gap:12px;}
-.v12-logo{
-    width:52px;height:52px;border-radius:18px;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:27px;
-    background:linear-gradient(135deg,#0f172a,#2563eb 55%,#14b8a6);
-    box-shadow:0 14px 32px rgba(37,99,235,.28);
-}
-.v12-brand-title{
-    font-family:'Space Grotesk', sans-serif !important;
-    font-size:1.22rem;
-    font-weight:800;
-    letter-spacing:-.03em;
-    color:#082f49 !important;
-    background:none !important;
-    -webkit-text-fill-color:initial !important;
-}
-.v12-brand-sub{font-size:.79rem;color:#64748b;font-weight:700;margin-top:1px;}
-.v12-section-pill,.v12-user-pill,.v12-chip,.mp-badge{
-    display:inline-flex;align-items:center;gap:6px;
-    padding:7px 13px;border-radius:999px;
-    font-size:.82rem;font-weight:850;
-    border:1px solid rgba(37,99,235,.16);
-    background:#eff6ff;color:#1d4ed8;
-    white-space:nowrap;
-}
-.v12-section-pill{background:linear-gradient(135deg,#0f172a,#2563eb);color:#fff;border:0;}
-.v12-user-pill{background:#ffffff;color:#0f172a;box-shadow:0 8px 20px rgba(15,23,42,.08);}
-
-/* Butang sistem: semua butang diselaraskan dengan tema biru dan hijau */
-div.stButton > button,
-div[data-testid="stFormSubmitButton"] button,
-button[kind="primary"],
-.stDownloadButton button{
-    border:0 !important;
-    border-radius:16px !important;
-    min-height:44px !important;
-    color:white !important;
-    font-weight:850 !important;
-    background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%) !important;
-    box-shadow:0 12px 24px rgba(37,99,235,.20) !important;
-    transition:all .2s ease !important;
-}
-div.stButton > button:hover,
-div[data-testid="stFormSubmitButton"] button:hover,
-button[kind="primary"]:hover,
-.stDownloadButton button:hover{
-    transform:translateY(-2px) scale(1.01);
-    box-shadow:0 18px 34px rgba(20,184,166,.25) !important;
-    filter:saturate(1.1);
-}
-
-/* Kad umum */
-.v12-card,.v12-question-card,.v12-tutor-card,.v12-result-card{
-    background:rgba(255,255,255,.90);
-    border:1px solid rgba(191,219,254,.75);
-    border-radius:28px;
-    padding:24px;
-    box-shadow:var(--bayang);
-    backdrop-filter:blur(18px);
-}
-.v12-card-title{
-    font-family:'Space Grotesk', sans-serif !important;
-    font-size:1.45rem;
-    font-weight:800;
-    color:#0f172a !important;
-    background:none !important;
-    -webkit-text-fill-color:initial !important;
-    margin-bottom:6px;
-}
-.v12-card-sub,.mp-small{color:#475569;font-size:.94rem;line-height:1.65;}
-
-/* Hero biru moden */
-.v12-hero-premium{
-    min-height:520px;
-    position:relative;
-    overflow:hidden;
-    border-radius:34px;
-    padding:34px;
-    background:
-        radial-gradient(circle at 14% 10%, rgba(125,211,252,.35), transparent 24%),
-        radial-gradient(circle at 88% 18%, rgba(45,212,191,.25), transparent 26%),
-        linear-gradient(135deg,#071f36 0%,#0f4c81 45%,#2563eb 76%,#14b8a6 100%) !important;
-    box-shadow:0 30px 70px rgba(2,132,199,.25);
-    color:white;
-}
-.v12-hero-premium:before{
-    content:"";
-    position:absolute;
-    width:330px;height:330px;border-radius:50%;
-    right:-105px;top:-120px;
-    background:rgba(255,255,255,.13);
-}
-.v12-hero-premium:after{
-    content:"∑  π  √  x²";
-    position:absolute;
-    right:24px;bottom:18px;
-    font-family:'Space Grotesk',sans-serif;
-    font-weight:800;
-    font-size:3rem;
-    color:rgba(255,255,255,.12);
-    letter-spacing:.08em;
-}
-.v12-hero-content{position:relative;z-index:1;}
-.v12-kicker{
-    display:inline-flex;align-items:center;gap:8px;
-    padding:8px 14px;
-    border-radius:999px;
-    background:rgba(255,255,255,.14);
-    border:1px solid rgba(255,255,255,.24);
-    font-weight:850;
-    font-size:.86rem;
-    margin-bottom:22px;
-}
-.v12-hero-title{
-    font-family:'Space Grotesk',sans-serif !important;
-    font-size:3.15rem;
-    line-height:1.02;
-    letter-spacing:-.055em;
-    margin:0 0 16px 0;
-    color:#ffffff !important;
-    background:none !important;
-    -webkit-text-fill-color:#ffffff !important;
-    text-shadow:0 2px 14px rgba(0,0,0,.16);
-}
-.v12-hero-desc{
-    max-width:96%;
-    font-size:1.04rem;
-    line-height:1.75;
-    color:#e0f2fe;
-    font-weight:700;
-    margin-bottom:20px;
-}
-.v12-feature-grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-    margin-top:22px;
-}
-.v12-feature-card{
-    background:rgba(255,255,255,.13);
-    border:1px solid rgba(255,255,255,.22);
-    border-radius:20px;
-    padding:14px 15px;
-    min-height:86px;
-}
-.v12-feature-card b{display:block;font-size:.96rem;color:#fff;font-weight:850;margin-bottom:5px;}
-.v12-feature-card span{font-size:.82rem;line-height:1.35;color:#dbeafe;font-weight:700;}
-.v12-feature-chip{
-    display:inline-flex;
-    align-items:center;
-    margin:6px 6px 0 0;
-    padding:8px 12px;
-    border-radius:999px;
-    background:rgba(255,255,255,.14);
-    border:1px solid rgba(255,255,255,.22);
-    color:#fff;
-    font-size:.82rem;
-    font-weight:850;
-}
-
-/* Borang dan kawalan input */
-[data-testid="stForm"]{
-    background:rgba(255,255,255,.82) !important;
-    border:1px solid rgba(147,197,253,.72) !important;
-    border-radius:26px !important;
-    padding:20px !important;
-    box-shadow:0 16px 42px rgba(37,99,235,.08) !important;
-}
-label{font-weight:850 !important;color:#1e3a8a !important;}
-
-/* Input, select dan number input ikut tema biru-hijau */
-.stTextInput input, .stNumberInput input, textarea{
-    border-radius:16px !important;
-    border:1px solid #bfdbfe !important;
-    background:#f8fbff !important;
-    color:#0f172a !important;
-}
-.stTextInput input:focus, .stNumberInput input:focus, textarea:focus{
-    border-color:#14b8a6 !important;
-    box-shadow:0 0 0 3px rgba(20,184,166,.18) !important;
-}
-[data-baseweb="select"] > div{
-    border-radius:16px !important;
-    border-color:#bfdbfe !important;
-    background:#f8fbff !important;
-    box-shadow:none !important;
-}
-[data-baseweb="select"]:focus-within > div{
-    border-color:#14b8a6 !important;
-    box-shadow:0 0 0 3px rgba(20,184,166,.18) !important;
-}
-[data-baseweb="popover"] [role="listbox"]{
-    border:1px solid #bfdbfe !important;
-    border-radius:16px !important;
-    box-shadow:0 18px 40px rgba(15,23,42,.16) !important;
-}
-[data-testid="stNumberInput"] button{
-    background:linear-gradient(135deg,#1d4ed8,#0f766e) !important;
-    color:white !important;
-    border:none !important;
-}
-[data-testid="stNumberInput"] button:hover{
-    background:linear-gradient(135deg,#0f766e,#14b8a6) !important;
-}
-
-/* Slider ikut tema sistem */
-[data-testid="stSlider"] [role="slider"]{
-    background:#0f766e !important;
-    border:3px solid #e0f2fe !important;
-    box-shadow:0 4px 14px rgba(20,184,166,.35) !important;
-}
-[data-testid="stSlider"] div[data-baseweb="slider"] > div{
-    color:#1d4ed8 !important;
-}
-
-/* Kad keputusan klasifikasi */
-.v12-smart-strip{
-    margin-top:18px;
-    background:linear-gradient(135deg,#ffffff 0%,#eff6ff 52%,#ecfdf5 100%);
-    border:1px solid rgba(147,197,253,.75);
-    border-radius:28px;
-    padding:24px;
-    display:grid;
-    grid-template-columns:1fr 250px;
-    gap:20px;
-    align-items:center;
-    box-shadow:0 20px 48px rgba(37,99,235,.10);
-}
-.v12-smart-title{font-family:'Space Grotesk',sans-serif;font-size:1.25rem;font-weight:800;color:#0f172a;margin-bottom:7px;}
-.v12-level-badge{
-    display:inline-flex;align-items:center;justify-content:center;
-    padding:10px 18px;
-    border-radius:999px;
-    color:#fff;
-    font-size:1rem;
-    font-weight:850;
-    box-shadow:0 12px 24px rgba(37,99,235,.20);
-    margin-bottom:10px;
-}
-.v12-confidence-track,.v12-progress-track{
-    width:100%;height:13px;border-radius:999px;background:#dbeafe;overflow:hidden;
-}
-.v12-confidence-fill,.v12-progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#14b8a6);}
-
-/* Papan pemuka */
-.v12-dashboard-hero,.mp-dashboard-top{
-    position:relative;
-    overflow:hidden;
-    border-radius:30px;
-    padding:28px;
-    color:#fff;
-    background:linear-gradient(135deg,#082f49,#1d4ed8 56%,#14b8a6);
-    box-shadow:0 25px 60px rgba(37,99,235,.18);
-    margin-bottom:20px;
-}
-.v12-dashboard-hero h2{color:#fff !important;-webkit-text-fill-color:#fff !important;background:none !important;margin:0 0 8px 0;}
-.v12-dashboard-hero p{color:#e0f2fe;font-weight:700;line-height:1.6;}
-.v12-status-item,.v12-result-stat{
-    background:#fff;
-    border:1px solid rgba(191,219,254,.8);
-    border-radius:20px;
-    padding:16px;
-    box-shadow:0 14px 32px rgba(37,99,235,.08);
-}
-
-/* Kuiz */
-.v12-quiz-head{
-    display:flex;justify-content:space-between;align-items:center;
-    border-radius:24px;padding:16px 20px;margin-bottom:14px;
-    border:1px solid rgba(191,219,254,.78);
-    background:rgba(255,255,255,.9);
-    box-shadow:0 14px 32px rgba(37,99,235,.08);
-}
-.v12-progress-wrap{margin:0 0 18px 0;}
-.v12-question-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
-.stRadio label{
-    background:#ffffff !important;
-    border:1px solid #bfdbfe !important;
-    border-radius:16px !important;
-    padding:12px 14px !important;
-    margin-bottom:8px !important;
-    box-shadow:0 8px 18px rgba(37,99,235,.04);
-}
-.stRadio label:hover{border-color:#14b8a6 !important;background:#f0fdfa !important;}
-.v12-tutor-header{display:flex;justify-content:space-between;align-items:center;font-weight:850;color:#0f172a;margin-bottom:12px;}
-.v12-ai-pill{font-size:.72rem;padding:5px 10px;border-radius:999px;background:#ecfdf5;color:#0f766e;border:1px solid #99f6e4;}
-.mp-status-ok,.mp-status-warn{display:inline-flex;padding:7px 12px;border-radius:999px;font-weight:850;font-size:.82rem;margin-bottom:12px;}
-.mp-status-ok{background:#ecfdf5;color:#047857;}
-.mp-status-warn{background:#fff7ed;color:#c2410c;}
-
-/* Keputusan */
-.v12-result-card{text-align:center;max-width:820px;margin:0 auto;}
-.v12-success-icon{font-size:3rem;margin-bottom:8px;}
-.v12-result-card h2{color:#0f172a !important;-webkit-text-fill-color:#0f172a !important;background:none !important;}
-.v12-score-panel{
-    margin:22px auto;
-    max-width:320px;
-    border-radius:28px;
-    padding:24px;
-    color:#fff;
-    background:linear-gradient(135deg,#1d4ed8,#14b8a6);
-    box-shadow:0 20px 46px rgba(37,99,235,.18);
-}
-.v12-score-panel .score{font-family:'Space Grotesk';font-weight:800;font-size:3.6rem;line-height:1;}
-.v12-result-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px;}
-.v12-result-stat b{display:block;color:#0f172a;font-size:1.3rem;font-weight:850;}
-.v12-result-stat span{font-size:.85rem;color:#475569;font-weight:800;}
-
-/* Jadual */
-[data-testid="stDataFrame"]{border-radius:22px;overflow:hidden;}
-
-/* Buang kotak kosong / pembungkus kosong Streamlit */
 [data-testid="stMarkdownContainer"]:empty,
 .element-container:has([data-testid="stMarkdownContainer"]:empty),
 .element-container:has(iframe[height="0"]),
@@ -417,775 +127,613 @@ div:has(> div[data-testid="stMarkdownContainer"]:empty){
 }
 .element-container{margin-bottom:.35rem !important;}
 
-/* Kad laporan dan visual lebih selari dengan tema */
-.js-plotly-plot, .stPlotlyChart, [data-testid="stImage"]{
-    border-radius:22px !important;
+.stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5{
+    font-family:var(--sans) !important;
+    color:var(--on-surface) !important;
+    font-weight:800 !important;
+    letter-spacing:-.015em !important;
+}
+.stMarkdown h5{
+    font-size:1.02rem !important;
+    font-weight:800 !important;
+    color:var(--on-surface) !important;
+    margin:22px 0 12px 0 !important;
+    padding-bottom:9px !important;
+    border-bottom:2px solid var(--primary) !important;
+    display:inline-block !important;
 }
 
-/* Panel pilihan latihan yang lebih hidup */
-.v18-training-panel{
-    background:linear-gradient(135deg,rgba(255,255,255,.94),rgba(239,246,255,.88));
-    border:1px solid rgba(147,197,253,.8);
-    border-radius:30px;
-    padding:26px;
-    box-shadow:0 24px 60px rgba(37,99,235,.12);
-    position:relative;
-    overflow:hidden;
+/* ------------------------------------------------------------
+   Topbar + navigation (glass)
+------------------------------------------------------------ */
+.v12-topbar{
+    position:sticky;top:.75rem;z-index:30;
+    display:flex;align-items:center;justify-content:space-between;gap:1rem;
+    padding:13px 20px;border-radius:var(--radius-lg);margin-bottom:18px;
+    background:rgba(255,255,255,.62);
+    border:1px solid rgba(255,255,255,.80);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9), var(--shadow-md);
+    backdrop-filter:blur(14px) saturate(1.6);
+    -webkit-backdrop-filter:blur(14px) saturate(1.6);
 }
-.v18-training-panel:after{
-    content:"";
-    position:absolute;
-    width:220px;height:220px;border-radius:50%;
-    right:-70px;top:-80px;
-    background:radial-gradient(circle,rgba(20,184,166,.18),transparent 70%);
+.v12-brand{display:flex;align-items:center;gap:12px;}
+.v12-logo{
+    width:46px;height:46px;border-radius:13px;flex:0 0 46px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--primary-deep);color:var(--accent);
+    border:1px solid var(--accent);overflow:hidden;
 }
-.v18-panel-title{
-    font-family:'Space Grotesk',sans-serif;
-    font-size:1.35rem;
-    font-weight:850;
-    color:#082f49;
-    margin-bottom:6px;
+.v12-logo svg{width:22px;height:22px;}
+.v12-logo-img{background:var(--surface-card);}
+.v12-logo-img img{width:100%;height:100%;object-fit:contain;padding:4px;box-sizing:border-box;}
+.v12-brand-title{
+    font-family:var(--sans);font-size:1.14rem;font-weight:800;letter-spacing:-.01em;
+    color:var(--on-surface) !important;background:none !important;-webkit-text-fill-color:initial !important;
 }
-.v18-note{
-    background:#ecfdf5;
-    border:1px solid #99f6e4;
-    color:#0f766e;
-    padding:13px 15px;
-    border-radius:18px;
-    font-weight:750;
-    line-height:1.55;
-    margin-top:14px;
+.v12-brand-sub{font-size:.78rem;color:var(--on-surface-variant);font-weight:600;margin-top:1px;}
+.v12-section-pill,.v12-user-pill{
+    display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;
+    font-size:.80rem;font-weight:700;white-space:nowrap;
 }
-.v18-count-grid{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:12px;
-    margin:16px 0 18px;
-}
-.v18-count-card{
-    background:#ffffff;
-    border:1px solid #dbeafe;
-    border-radius:20px;
-    padding:14px;
-    box-shadow:0 12px 28px rgba(37,99,235,.07);
-}
-.v18-count-card span{font-size:.78rem;color:#64748b;font-weight:800;}
-.v18-count-card b{display:block;font-size:1.35rem;color:#082f49;margin-top:4px;}
-.v18-system-card{
-    background:linear-gradient(135deg,#082f49 0%,#1d4ed8 58%,#0f766e 100%);
-    color:white;
-    border-radius:30px;
-    padding:26px;
-    box-shadow:0 24px 58px rgba(37,99,235,.18);
-    min-height:100%;
-}
-.v18-system-card h3{color:white !important;-webkit-text-fill-color:white !important;background:none !important;margin-top:0;}
-.v18-system-card p{color:#dbeafe;line-height:1.7;font-weight:700;}
-.v18-mini-feature{
-    background:rgba(255,255,255,.12);
-    border:1px solid rgba(255,255,255,.18);
-    border-radius:18px;
-    padding:12px;
-    margin:10px 0;
-    color:#eff6ff;
-    font-weight:750;
-}
-.v18-timer-card{
-    font-family:Inter,Arial;
-    background:linear-gradient(135deg,#ffffff,#eff6ff);
-    border:1px solid #93c5fd;
-    border-radius:18px;
-    padding:12px 14px;
-    text-align:center;
-    min-width:140px;
-    box-shadow:0 14px 28px rgba(37,99,235,.12);
-}
-.v18-timer-label{font-size:11px;color:#1d4ed8;font-weight:900;letter-spacing:.03em;}
-.v18-timer-time{font-size:24px;font-weight:950;color:#082f49;line-height:1.15;}
-.v18-timer-sub{font-size:11px;color:#0f766e;font-weight:850;}
+.v12-section-pill{background:var(--primary);color:#fff;box-shadow:0 6px 16px rgba(26,86,219,.28);}
+.v12-user-pill{background:rgba(255,255,255,.85);color:var(--on-surface);border:1px solid rgba(255,255,255,.9);}
 
+@media (max-width:900px){
+    .v12-topbar{position:relative;top:0;flex-direction:column;align-items:flex-start;}
+}
 
-/* V19: Papan pemuka lebih bersih dan tidak serabut */
-.v19-section-title{
-    display:flex;align-items:center;gap:12px;margin:28px 0 14px 0;
+/* ------------------------------------------------------------
+   Buttons
+------------------------------------------------------------ */
+div.stButton > button,
+div[data-testid="stFormSubmitButton"] button,
+.stDownloadButton button{
+    border-radius:999px !important;
+    min-height:44px !important;
+    padding:0 22px !important;
+    font-weight:800 !important;
+    letter-spacing:.01em !important;
+    transition:background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease !important;
 }
-.v19-section-title h2{
-    font-family:'Space Grotesk',sans-serif !important;
-    margin:0 !important;
-    font-size:1.85rem !important;
-    color:#0f172a !important;
-    background:none !important;
-    -webkit-text-fill-color:#0f172a !important;
+div.stButton > button[kind="primary"],
+div[data-testid="stFormSubmitButton"] button[kind="primaryFormSubmit"],
+div[data-testid="stFormSubmitButton"] button[kind="primary"]{
+    border:1px solid var(--primary) !important;
+    background:var(--primary) !important;
+    color:var(--on-primary) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.20), 0 8px 20px rgba(26,86,219,.28) !important;
 }
-.v19-section-title span{
-    background:#ecfdf5;
-    color:#0f766e;
-    border:1px solid #99f6e4;
-    border-radius:999px;
-    padding:7px 12px;
-    font-size:.78rem;
-    font-weight:900;
+div.stButton > button[kind="primary"]:hover,
+div[data-testid="stFormSubmitButton"] button[kind="primaryFormSubmit"]:hover,
+div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover{
+    background:var(--primary-hover) !important;
+    border-color:var(--primary-hover) !important;
+    transform:translateY(-1px);
 }
-.v19-clean-card{
-    background:rgba(255,255,255,.92);
-    border:1px solid rgba(191,219,254,.85);
-    border-radius:30px;
-    padding:24px;
-    box-shadow:0 22px 55px rgba(37,99,235,.10);
-    backdrop-filter:blur(18px);
-    margin-bottom:16px;
+div.stButton > button[kind="secondary"],
+div[data-testid="stFormSubmitButton"] button[kind="secondaryFormSubmit"],
+div[data-testid="stFormSubmitButton"] button[kind="secondary"],
+.stDownloadButton button{
+    background:var(--surface-card) !important;
+    border:1.5px solid var(--outline-strong) !important;
+    color:var(--on-surface) !important;
 }
-.v19-card-head{
-    display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px;
+div.stButton > button[kind="secondary"]:hover,
+div[data-testid="stFormSubmitButton"] button[kind="secondaryFormSubmit"]:hover,
+.stDownloadButton button:hover{
+    border-color:var(--primary) !important;
+    color:var(--primary) !important;
+    background:var(--primary-container) !important;
 }
-.v19-card-head h3{
-    font-family:'Space Grotesk',sans-serif !important;
-    font-size:1.35rem !important;
-    color:#082f49 !important;
-    background:none !important;
-    -webkit-text-fill-color:#082f49 !important;
-    margin:0 !important;
+div.stButton > button:focus-visible,
+div[data-testid="stFormSubmitButton"] button:focus-visible{
+    outline:2px solid var(--primary) !important;
+    outline-offset:2px !important;
 }
-.v19-card-head p{margin:6px 0 0 0;color:#64748b;font-weight:700;line-height:1.55;}
-.v19-soft-badge{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:999px;padding:8px 12px;font-weight:900;font-size:.78rem;white-space:nowrap;}
-.v19-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0 18px 0;}
-.v19-stat{
-    background:linear-gradient(135deg,#ffffff 0%,#eff6ff 100%);
-    border:1px solid #bfdbfe;
-    border-radius:22px;
-    padding:16px;
-    box-shadow:0 12px 28px rgba(37,99,235,.06);
-}
-.v19-stat small{display:block;color:#64748b;font-weight:850;font-size:.78rem;margin-bottom:6px;}
-.v19-stat strong{display:block;color:#082f49;font-size:1.15rem;font-weight:950;line-height:1.25;}
-.v19-green-note{
-    background:linear-gradient(135deg,#ecfdf5 0%,#f0fdfa 100%);
-    border:1px solid #99f6e4;
-    color:#0f766e;
-    padding:14px 16px;
-    border-radius:20px;
-    font-weight:780;
-    line-height:1.6;
-    margin:14px 0 16px 0;
-}
-.v19-side-card{
-    background:linear-gradient(135deg,#082f49 0%,#1d4ed8 55%,#0f766e 100%);
-    border-radius:30px;
-    color:white;
-    padding:26px;
-    box-shadow:0 24px 58px rgba(37,99,235,.20);
-    margin-bottom:14px;
-    min-height:250px;
-}
-.v19-side-card h3{color:white !important;-webkit-text-fill-color:white !important;background:none !important;margin:0 0 10px 0 !important;font-family:'Space Grotesk',sans-serif !important;font-size:1.45rem !important;}
-.v19-side-card p{color:#dbeafe;font-weight:750;line-height:1.65;margin-bottom:16px;}
-.v19-side-item{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:12px 14px;margin:10px 0;color:#eff6ff;font-weight:780;}
-.v19-model-pill{background:#e0f2fe;border:1px solid #93c5fd;border-radius:18px;padding:13px 15px;color:#075985;font-weight:850;margin-bottom:14px;}
-.v19-divider{height:1px;background:linear-gradient(90deg,transparent,#bfdbfe,transparent);margin:18px 0;}
+div.stButton > button:disabled{opacity:.5 !important;}
 
-/* Buang elemen kosong yang terjadi daripada HTML wrapper Streamlit */
-.v18-training-panel:empty,
-.v12-card:empty,
-.v12-question-card:empty,
-.v12-tutor-card:empty,
-.v12-result-card:empty{
-    display:none !important;
-    padding:0 !important;
-    margin:0 !important;
-    border:0 !important;
+/* Petunjuk (hint) button: distinct accent-orange, full-width bar under the composer row */
+.st-key-mp_hint_btn_container{margin-top:8px;}
+.st-key-mp_hint_btn_container div[data-testid="stFormSubmitButton"] button{
+    background:var(--accent) !important;
+    border:1px solid var(--accent) !important;
+    color:var(--on-accent) !important;
+    min-height:44px !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 6px 16px rgba(242,153,74,.30) !important;
+}
+.st-key-mp_hint_btn_container div[data-testid="stFormSubmitButton"] button:hover{
+    background:var(--accent-hover) !important;
+    border-color:var(--accent-hover) !important;
+    color:#fff !important;
+}
+
+/* Send button: rounded rectangle (not the global pill) sized to align with the
+   textarea beside it — a pill at this width/height ratio would collapse into a circle */
+.st-key-mp_send_btn_container div[data-testid="stFormSubmitButton"] button{
+    border-radius:var(--radius-md) !important;
+    min-height:60px !important;
+    padding:0 4px !important;
+    font-size:.80rem !important;
+    white-space:nowrap !important;
+}
+
+/* ------------------------------------------------------------
+   Forms and inputs
+------------------------------------------------------------ */
+[data-testid="stForm"]{
+    background:var(--surface-card) !important;
+    border:1px solid var(--outline) !important;
+    border-radius:var(--radius-lg) !important;
+    padding:20px !important;
+    box-shadow:var(--shadow-sm) !important;
+}
+label{font-weight:700 !important;color:var(--on-surface-variant) !important;}
+
+.stTextInput input, .stNumberInput input, textarea{
+    border-radius:var(--radius-sm) !important;
+    border:1.5px solid var(--outline-strong) !important;
+    background:var(--surface-card) !important;
+    color:var(--on-surface) !important;
+}
+.stTextInput input:focus, .stNumberInput input:focus, textarea:focus{
+    border-color:var(--primary) !important;
+    box-shadow:0 0 0 3px var(--primary-container) !important;
+}
+[data-baseweb="select"] > div{
+    border-radius:var(--radius-sm) !important;
+    border:1.5px solid var(--outline-strong) !important;
+    background:var(--surface-card) !important;
     box-shadow:none !important;
 }
-
-/* Pemasa v19 */
-.v19-timer-shell{
-    background:linear-gradient(135deg,#ffffff 0%,#eff6ff 55%,#ecfdf5 100%);
-    border:1px solid #93c5fd;
-    border-radius:22px;
-    padding:14px 18px;
-    box-shadow:0 16px 34px rgba(37,99,235,.12);
-    text-align:center;
-    min-height:72px;
+[data-baseweb="select"]:focus-within > div{
+    border-color:var(--primary) !important;
+    box-shadow:0 0 0 3px var(--primary-container) !important;
 }
-.v19-timer-label{font-size:.76rem;color:#1d4ed8;font-weight:950;letter-spacing:.05em;text-transform:uppercase;}
-.v19-timer-time{font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:900;color:#082f49;line-height:1;margin-top:5px;}
-.v19-timer-sub{font-size:.78rem;color:#0f766e;font-weight:850;margin-top:4px;}
-
-@media (max-width:900px){.v19-stat-grid{grid-template-columns:1fr;}}
-
-
-@media (max-width: 900px){
-    .v12-smart-strip{grid-template-columns:1fr;}
-    .v12-feature-grid{grid-template-columns:1fr;}
-    .v12-hero-title{font-size:2.35rem;}
-    .v12-topbar{position:relative;top:0;flex-direction:column;align-items:flex-start;}
-    .v12-result-stats{grid-template-columns:1fr;}
-    .v18-count-grid{grid-template-columns:1fr;}
+[data-baseweb="popover"] [role="listbox"]{
+    border:1px solid var(--outline) !important;
+    border-radius:var(--radius-sm) !important;
+    box-shadow:var(--shadow-md) !important;
 }
-
-
-/* ============================================================
-   V20 REFINEMENT: dashboard premium, input color consistency,
-   timer card and removal of empty pill/border artifacts
-   ============================================================ */
-.v19-section-title{display:none !important;}
-.element-container:has(.v20-hide-empty){display:none !important;}
-[data-testid="stDecoration"]{display:none !important;}
-
-/* Override form widget accents to blue/teal, including plus-minus and dropdown borders */
-[data-baseweb="select"] > div,
-[data-testid="stNumberInput"] input,
-.stNumberInput input,
-.stTextInput input{
-    border:1.5px solid rgba(37,99,235,.25) !important;
-    background:#f8fbff !important;
-    border-radius:15px !important;
-}
-[data-baseweb="select"]:focus-within > div,
-[data-testid="stNumberInput"]:focus-within input,
-.stTextInput input:focus{
-    border-color:#14b8a6 !important;
-    box-shadow:0 0 0 4px rgba(20,184,166,.14) !important;
-}
-[data-testid="stNumberInput"] button,
-[data-testid="stNumberInput"] button:hover{
-    background:linear-gradient(135deg,#2563eb,#0f766e) !important;
-    color:#ffffff !important;
+[data-testid="stNumberInput"] button{
+    background:var(--primary-deep) !important;
+    color:#fff !important;
     border:0 !important;
 }
+[data-testid="stNumberInput"] button:hover{background:var(--primary) !important;}
+
 [data-testid="stSlider"] [role="slider"]{
-    background:#14b8a6 !important;
-    border:4px solid #dffdf6 !important;
-    box-shadow:0 8px 20px rgba(20,184,166,.35) !important;
+    background:var(--primary) !important;
+    border:3px solid #ffffff !important;
+    box-shadow:0 0 0 1px var(--outline-strong) !important;
+}
+[data-testid="stSlider"] div[data-baseweb="slider"] > div{
+    color:var(--primary-deep) !important;
+    font-weight:700 !important;
 }
 
-.v20-dashboard-wrap{
-    display:grid;
-    grid-template-columns:1fr 330px;
-    gap:20px;
-    align-items:stretch;
-    margin-top:18px;
-}
-.v20-learning-card{
-    background:rgba(255,255,255,.94);
-    border:1px solid rgba(147,197,253,.70);
-    border-radius:30px;
-    padding:24px 26px;
-    box-shadow:0 24px 58px rgba(37,99,235,.12);
-    position:relative;
-    overflow:hidden;
-}
-.v20-learning-card:before{
-    content:"";
-    position:absolute;
-    right:-90px;top:-120px;
-    width:260px;height:260px;border-radius:50%;
-    background:radial-gradient(circle,rgba(20,184,166,.20),transparent 65%);
-}
-.v20-card-kicker{
-    display:inline-flex;align-items:center;gap:7px;
-    padding:7px 12px;
-    border-radius:999px;
-    background:#ecfdf5;
-    border:1px solid #99f6e4;
-    color:#0f766e;
-    font-size:.78rem;
-    font-weight:900;
-    margin-bottom:12px;
-}
-.v20-card-title{
-    font-family:'Space Grotesk',sans-serif;
-    color:#082f49;
-    font-size:1.65rem;
-    line-height:1.1;
-    font-weight:900;
-    margin:0 0 8px 0;
-    letter-spacing:-.035em;
-}
-.v20-card-desc{color:#475569;font-weight:700;line-height:1.62;margin-bottom:18px;}
-.v20-flow{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:12px;
-    margin-top:14px;
-}
-.v20-flow-step{
-    background:linear-gradient(135deg,#f8fbff,#eff6ff);
-    border:1px solid #bfdbfe;
-    border-radius:20px;
-    padding:14px;
-    min-height:100px;
-}
-.v20-flow-step b{display:block;color:#082f49;font-size:.95rem;margin-bottom:5px;}
-.v20-flow-step span{display:block;color:#64748b;font-size:.82rem;font-weight:750;line-height:1.4;}
-.v20-hero-mini{
-    background:linear-gradient(135deg,#082f49,#1d4ed8 55%,#0f766e);
-    color:white;
-    border-radius:30px;
-    padding:24px;
-    box-shadow:0 24px 60px rgba(37,99,235,.20);
-    min-height:100%;
-    position:relative;overflow:hidden;
-}
-.v20-hero-mini:after{
-    content:"x²  ∑  π";
-    position:absolute;right:18px;bottom:12px;
-    color:rgba(255,255,255,.10);
-    font-family:'Space Grotesk';font-size:2.2rem;font-weight:900;
-}
-.v20-hero-mini h3{color:white !important;-webkit-text-fill-color:white !important;background:none !important;margin:0 0 10px 0 !important;font-size:1.6rem !important;}
-.v20-hero-mini p{color:#dbeafe;font-weight:700;line-height:1.62;}
-.v20-side-metric{
-    background:rgba(255,255,255,.12);
-    border:1px solid rgba(255,255,255,.20);
-    border-radius:18px;
-    padding:13px 14px;
-    margin-top:10px;
-    color:#eff6ff;
-    font-weight:800;
-}
-.v20-side-metric small{display:block;color:#bfdbfe;font-weight:800;margin-bottom:3px;}
-.v20-side-metric b{font-size:1.15rem;color:white;}
-.v20-settings-title{
-    font-family:'Space Grotesk',sans-serif;
-    color:#082f49;
-    font-size:1.3rem;
-    font-weight:900;
-    margin:0 0 4px 0;
-}
-.v20-settings-sub{color:#64748b;font-weight:700;line-height:1.55;margin-bottom:14px;}
-.v20-summary-grid{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:12px;
-    margin:14px 0;
-}
-.v20-summary-card{
-    background:#ffffff;
-    border:1px solid #dbeafe;
-    border-radius:19px;
-    padding:13px 14px;
-    box-shadow:0 10px 26px rgba(37,99,235,.06);
-}
-.v20-summary-card small{display:block;color:#64748b;font-size:.76rem;font-weight:850;margin-bottom:4px;}
-.v20-summary-card b{display:block;color:#082f49;font-size:1.06rem;line-height:1.2;font-weight:950;}
-.v20-adapt-note{
-    margin:12px 0 16px 0;
-    padding:13px 15px;
-    background:linear-gradient(135deg,#ecfdf5,#f0fdfa);
-    border:1px solid #99f6e4;
-    border-radius:18px;
-    color:#0f766e;
-    font-weight:800;
-    line-height:1.55;
-}
-.v20-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
-
-.v20-timer-card{
-    width:100%;
-    min-height:96px;
-    box-sizing:border-box;
-    border-radius:24px;
-    padding:16px 18px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:16px;
-    background:linear-gradient(135deg,#082f49 0%,#1d4ed8 58%,#14b8a6 100%);
-    color:#ffffff;
-    box-shadow:0 20px 42px rgba(37,99,235,.23);
-    border:1px solid rgba(255,255,255,.22);
-}
-.v20-timer-left{display:flex;align-items:center;gap:12px;}
-.v20-timer-icon{width:46px;height:46px;border-radius:16px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:24px;}
-.v20-timer-label{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#dbeafe;}
-.v20-timer-sub{font-size:12px;font-weight:800;color:#ccfbf1;margin-top:3px;}
-.v20-timer-time{font-family:'Space Grotesk',Arial,sans-serif;font-size:2.25rem;font-weight:900;letter-spacing:-.04em;line-height:1;}
-.v20-timer-warning .v20-timer-time{color:#fecaca;}
-
-
-/* Penambahbaikan v21: bar maklumat kuiz sebaris dan butang jawapan lebih premium */
-.v21-question-surface{
-    background:rgba(255,255,255,.92);
-    border:1px solid rgba(191,219,254,.8);
-    border-radius:30px;
-    padding:22px 24px;
-    box-shadow:0 22px 55px rgba(37,99,235,.13);
-}
-.v21-answer-action{
-    margin-top:18px;
-    padding-top:18px;
-    border-top:1px solid rgba(191,219,254,.78);
-}
-.v21-answer-action + div button,
-.v21-long-submit button{
-    min-height:52px !important;
-    border-radius:20px !important;
-    font-size:.96rem !important;
-    letter-spacing:.01em !important;
-    background:linear-gradient(135deg,#1d4ed8 0%,#0f766e 100%) !important;
-    box-shadow:0 16px 35px rgba(37,99,235,.25) !important;
-}
-
-@media(max-width:900px){
-    .v20-dashboard-wrap{grid-template-columns:1fr;}
-    .v20-flow,.v20-summary-grid,.v20-actions{grid-template-columns:1fr;}
-}
-
-
-
-/* ============================================================
-   V24 CLEAN QUIZ + ADVANCED PERFORMANCE UI
-   - removes blank bordered wrappers
-   - cleaner prototype-style quiz layout
-   - richer performance dashboard
-   ============================================================ */
-.v24-quiz-hero{
-    background:linear-gradient(135deg,#ffffff 0%,#eff6ff 55%,#ecfdf5 100%);
-    border:1px solid rgba(147,197,253,.85);
-    border-radius:26px;
-    padding:18px 20px;
-    box-shadow:0 18px 42px rgba(37,99,235,.10);
-    margin-bottom:18px;
-}
-.v24-quiz-hero-row{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
-.v24-quiz-user{font-weight:950;color:#082f49;font-size:1.02rem;}
-.v24-quiz-sub{font-size:.84rem;color:#475569;font-weight:750;margin-top:3px;}
-.v24-progress-label{display:flex;justify-content:space-between;margin:12px 0 7px 0;font-size:.78rem;font-weight:950;color:#1d4ed8;}
-.v24-progress-track{height:11px;background:#dbeafe;border-radius:999px;overflow:hidden;}
-.v24-progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#14b8a6);}
-.v24-question-box{
-    background:rgba(255,255,255,.92);
-    border:1px solid rgba(191,219,254,.85);
-    border-radius:28px;
-    padding:22px 24px;
-    box-shadow:0 20px 46px rgba(37,99,235,.10);
-    margin-bottom:16px;
-}
-.v24-question-title{font-size:1.22rem;font-weight:900;color:#0f172a;line-height:1.55;margin:16px 0 2px 0;}
-.v24-answer-label{font-weight:900;color:#1e3a8a;font-size:.88rem;margin:14px 0 8px 0;}
-.v24-tutor-box{
-    background:rgba(255,255,255,.92);
-    border:1px solid rgba(191,219,254,.85);
-    border-radius:28px;
-    padding:20px;
-    box-shadow:0 20px 46px rgba(37,99,235,.10);
-    margin-bottom:16px;
-}
-.v24-tutor-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
-.v24-tutor-title{font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:950;color:#082f49;}
-.v24-tutor-note{background:#ecfdf5;border:1px solid #99f6e4;color:#0f766e;border-radius:18px;padding:13px 14px;font-weight:750;line-height:1.55;font-size:.86rem;margin:12px 0;}
-.v24-tutor-divider{height:1px;background:linear-gradient(90deg,transparent,#bfdbfe,transparent);margin:16px 0;}
-.v24-feedback-card{border-radius:22px;padding:14px 16px;margin:18px 0 4px 0;font-weight:780;line-height:1.55;}
-.v24-feedback-ok{background:#ecfdf5;border:1px solid #99f6e4;color:#0f766e;}
-.v24-feedback-warn{background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;}
-.v24-results-wrap{
-    background:linear-gradient(135deg,#ffffff,#eff6ff 55%,#ecfdf5);
-    border:1px solid rgba(147,197,253,.8);
-    border-radius:32px;
-    padding:28px;
-    box-shadow:0 24px 60px rgba(37,99,235,.12);
-    text-align:center;
-}
-.v24-performance-hero{
-    background:linear-gradient(135deg,#082f49 0%,#1d4ed8 55%,#14b8a6 100%);
-    color:white;
-    border-radius:32px;
-    padding:28px;
-    box-shadow:0 26px 64px rgba(37,99,235,.22);
-    margin-bottom:20px;
-    position:relative;
-    overflow:hidden;
-}
-.v24-performance-hero:after{content:'∑  π  x²';position:absolute;right:24px;bottom:10px;color:rgba(255,255,255,.10);font-family:'Space Grotesk';font-size:3rem;font-weight:950;}
-.v24-performance-hero h2{color:#fff !important;-webkit-text-fill-color:#fff !important;background:none !important;margin:0 0 8px 0 !important;font-family:'Space Grotesk',sans-serif !important;font-size:2rem !important;}
-.v24-performance-hero p{color:#dbeafe;font-weight:750;line-height:1.62;max-width:760px;margin:0;}
-.v24-metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0 20px 0;}
-.v24-metric-card{background:rgba(255,255,255,.94);border:1px solid #bfdbfe;border-radius:24px;padding:18px;box-shadow:0 16px 36px rgba(37,99,235,.08);}
-.v24-metric-card small{display:block;color:#64748b;font-weight:900;font-size:.76rem;margin-bottom:6px;}
-.v24-metric-card strong{display:block;color:#082f49;font-size:1.55rem;font-weight:950;line-height:1.15;}
-.v24-metric-card span{display:block;color:#0f766e;font-size:.78rem;font-weight:850;margin-top:6px;}
-.v24-section-card{background:rgba(255,255,255,.92);border:1px solid rgba(191,219,254,.85);border-radius:28px;padding:20px;box-shadow:0 20px 46px rgba(37,99,235,.10);margin-bottom:16px;}
-.v24-section-card h3{font-family:'Space Grotesk',sans-serif !important;color:#082f49 !important;-webkit-text-fill-color:#082f49 !important;background:none !important;margin:0 0 6px 0 !important;font-size:1.25rem !important;}
-.v24-section-card p{color:#64748b;font-weight:720;line-height:1.55;margin:0 0 12px 0;}
-.v24-soft-pill{display:inline-flex;align-items:center;gap:6px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:999px;padding:7px 11px;font-weight:900;font-size:.78rem;margin:4px 6px 4px 0;}
-@media(max-width:900px){.v24-metric-grid{grid-template-columns:1fr 1fr;}.v24-performance-hero h2{font-size:1.55rem !important;}}
-@media(max-width:600px){.v24-metric-grid{grid-template-columns:1fr;}}
-
-
-
-/* ============================================================
-   V25 CLEANER QUIZ UI + FIXED CHAT PANEL
-   ============================================================ */
-.v25-compact-head{background:rgba(255,255,255,.92);border:1px solid rgba(191,219,254,.8);border-radius:24px;padding:16px 18px;box-shadow:0 18px 42px rgba(37,99,235,.08);margin-bottom:14px;}
-.v25-head-row{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
-.v25-head-title{font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:950;color:#082f49;}
-.v25-head-sub{font-size:.82rem;color:#64748b;font-weight:780;margin-top:2px;}
-.v25-progress-mini{height:9px;background:#dbeafe;border-radius:999px;overflow:hidden;margin-top:12px;}
-.v25-progress-mini-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#14b8a6);}
-.v25-question-panel{background:rgba(255,255,255,.94);border:1px solid rgba(191,219,254,.86);border-radius:26px;padding:22px 24px;box-shadow:0 22px 52px rgba(37,99,235,.10);margin-top:12px;}
-.v25-question-title{color:#0f172a;font-size:1.18rem;font-weight:950;line-height:1.55;margin:0 0 16px 0;}
-.v25-question-line{height:1px;background:linear-gradient(90deg,#dbeafe,transparent);margin:16px 0;}
-.v25-answer-note{font-size:.84rem;color:#1d4ed8;font-weight:850;margin-bottom:10px;}
-.v25-submit-space{margin-top:16px;}
-.v25-tutor-panel{background:rgba(255,255,255,.95);border:1px solid rgba(191,219,254,.9);border-radius:26px;padding:18px;box-shadow:0 22px 52px rgba(37,99,235,.10);position:sticky;top:96px;}
-.v25-tutor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
-.v25-tutor-title{font-family:'Space Grotesk',sans-serif;font-size:1.16rem;font-weight:950;color:#082f49;}
-.v25-tutor-desc{background:#ecfdf5;border:1px solid #99f6e4;color:#0f766e;border-radius:16px;padding:12px 13px;font-weight:800;line-height:1.45;font-size:.84rem;margin-bottom:12px;}
-.v25-chat-box{height:285px;overflow-y:auto;background:linear-gradient(135deg,#f8fbff,#f0fdfa);border:1px solid #dbeafe;border-radius:20px;padding:12px;margin:12px 0;}
-.v25-chat-box::-webkit-scrollbar{width:7px;}
-.v25-chat-box::-webkit-scrollbar-thumb{background:#bfdbfe;border-radius:99px;}
-.v25-chat-msg{display:flex;gap:8px;margin-bottom:10px;align-items:flex-start;}
-.v25-chat-msg.user{justify-content:flex-end;}
-.v25-avatar{width:30px;height:30px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 30px;}
-.v25-avatar.bot{background:#f59e0b;color:white;}
-.v25-avatar.user{background:#2563eb;color:white;order:2;}
-.v25-bubble{max-width:86%;padding:10px 12px;border-radius:16px;font-size:.86rem;line-height:1.55;font-weight:650;}
-.v25-bubble.bot{background:#ffffff;border:1px solid #bfdbfe;color:#0f172a;border-top-left-radius:6px;}
-.v25-bubble.user{background:linear-gradient(135deg,#2563eb,#0f766e);color:white;border-top-right-radius:6px;}
-.v25-tutor-actions{display:grid;grid-template-columns:1fr;gap:10px;margin:10px 0 12px 0;}
-.v25-feedback{border-radius:18px;padding:13px 14px;margin-top:14px;font-weight:760;line-height:1.5;}
-.v25-feedback.ok{background:#ecfdf5;border:1px solid #99f6e4;color:#0f766e;}
-.v25-feedback.warn{background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;}
-@media(max-width:900px){.v25-tutor-panel{position:relative;top:0;}.v25-chat-box{height:240px;}}
-
-
-/* ============================================================
-   V26 REFINEMENT: quiz lebih kemas, pilihan jawapan penuh,
-   tutor chat fixed box, dan popup petunjuk.
-   ============================================================ */
-.v26-page-note{display:none !important;}
-.v25-compact-head{
-    background:rgba(255,255,255,.94) !important;
-    border:1px solid rgba(147,197,253,.70) !important;
-    border-radius:28px !important;
-    padding:18px 20px !important;
-    box-shadow:0 18px 44px rgba(37,99,235,.09) !important;
-    margin-bottom:18px !important;
-}
-.v25-question-panel{
-    background:#ffffff !important;
-    border:1px solid rgba(147,197,253,.70) !important;
-    border-radius:26px !important;
-    padding:24px 26px !important;
-    box-shadow:0 18px 44px rgba(37,99,235,.08) !important;
-    margin-top:16px !important;
-}
-.v25-question-title{font-size:1.12rem !important;line-height:1.6 !important;}
-.v25-answer-note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:16px;padding:11px 13px;color:#1d4ed8;font-weight:900;margin-top:8px;}
-
-/* Jadikan pilihan jawapan lebih kemas dan penuh seperti prototaip */
-div[data-testid="stRadio"] > div{gap:10px !important;}
+.stRadio label,
 div[data-testid="stRadio"] label{
     width:100% !important;
-    min-height:54px !important;
-    border-radius:16px !important;
-    border:1px solid #bfdbfe !important;
-    background:rgba(255,255,255,.96) !important;
-    padding:12px 16px !important;
-    box-shadow:0 8px 20px rgba(37,99,235,.055) !important;
+    background:var(--surface-card) !important;
+    border:1.5px solid var(--outline) !important;
+    border-radius:var(--radius-sm) !important;
+    padding:13px 16px !important;margin-bottom:8px !important;min-height:52px !important;
+    box-shadow:none !important;
+    transition:border-color .15s ease, background .15s ease;
 }
+div[data-testid="stRadio"] > div{gap:8px !important;}
+.stRadio label:hover,
 div[data-testid="stRadio"] label:hover{
-    border-color:#14b8a6 !important;
-    background:#f0fdfa !important;
+    border-color:var(--primary) !important;
+    background:var(--primary-container) !important;
 }
 div[data-testid="stRadio"] label p{
-    font-size:.94rem !important;
-    line-height:1.45 !important;
-    color:#0f172a !important;
-    font-weight:650 !important;
+    font-size:.94rem !important;line-height:1.45 !important;
+    color:var(--on-surface) !important;font-weight:550 !important;
 }
 
-.v26-tutor-card{
-    background:#ffffff;
-    border:1px solid rgba(147,197,253,.74);
-    border-radius:28px;
-    padding:18px;
-    box-shadow:0 22px 56px rgba(37,99,235,.11);
-    position:sticky;
-    top:96px;
-}
-.v26-tutor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
-.v26-tutor-title{font-family:'Space Grotesk',sans-serif;font-size:1.22rem;font-weight:950;color:#082f49;}
-.v26-tutor-desc{background:#ecfdf5;border:1px solid #99f6e4;color:#0f766e;border-radius:16px;padding:12px 13px;font-weight:850;line-height:1.48;font-size:.86rem;margin-bottom:12px;}
-.v26-api-pill{display:inline-flex;align-items:center;padding:7px 12px;border-radius:999px;background:#ecfdf5;color:#047857;border:1px solid #99f6e4;font-size:.78rem;font-weight:900;margin-bottom:12px;}
-.v26-api-pill.warn{background:#fff7ed;color:#c2410c;border-color:#fed7aa;}
-.v26-chat-title{font-size:.82rem;font-weight:950;color:#1e40af;margin:8px 0 8px 0;}
-.v26-form-card{background:rgba(255,255,255,.90);border:1px solid #bfdbfe;border-radius:22px;padding:14px 15px;box-shadow:0 14px 32px rgba(37,99,235,.07);margin-top:14px;}
-.v26-hint-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:16px;padding:11px 13px;font-weight:800;font-size:.84rem;line-height:1.45;margin-top:10px;}
-@media(max-width:900px){.v26-tutor-card{position:relative;top:0;}}
-
-
-/* V33 FINAL: Tooltip kelabu + dropdown penuh + elak option jadi S.. / K.. */
-
-/* Tooltip/help icon (?) kecil kelabu macam Streamlit asal */
-[data-testid="stTooltipHoverTarget"] {
-    display:inline-flex !important;
-    align-items:center !important;
-    justify-content:center !important;
-    width:18px !important;
-    height:18px !important;
-    min-width:18px !important;
-    min-height:18px !important;
-    max-width:18px !important;
-    max-height:18px !important;
-    margin-left:6px !important;
-    padding:0 !important;
-    border-radius:50% !important;
-    background:transparent !important;
-    border:0 !important;
-    box-shadow:none !important;
+[data-testid="stTooltipHoverTarget"]{
+    display:inline-flex !important;align-items:center !important;justify-content:center !important;
+    width:18px !important;height:18px !important;min-width:18px !important;min-height:18px !important;
+    max-width:18px !important;max-height:18px !important;margin-left:6px !important;padding:0 !important;
+    border-radius:50% !important;background:transparent !important;border:0 !important;box-shadow:none !important;
 }
 [data-testid="stTooltipHoverTarget"] button,
 [data-testid="stTooltipHoverTarget"] button:hover,
 [data-testid="stTooltipHoverTarget"] button:focus,
-[data-testid="stTooltipHoverTarget"] button:active {
-    width:18px !important;
-    height:18px !important;
-    min-width:18px !important;
-    min-height:18px !important;
-    max-width:18px !important;
-    max-height:18px !important;
-    padding:0 !important;
-    margin:0 !important;
-    border-radius:50% !important;
-    background:transparent !important;
-    background-image:none !important;
-    border:0 !important;
-    box-shadow:none !important;
-    outline:none !important;
-    color:#8b97a3 !important;
-    transform:none !important;
+[data-testid="stTooltipHoverTarget"] button:active{
+    width:18px !important;height:18px !important;min-width:18px !important;min-height:18px !important;
+    max-width:18px !important;max-height:18px !important;padding:0 !important;margin:0 !important;
+    border-radius:50% !important;background:transparent !important;background-image:none !important;
+    border:0 !important;box-shadow:none !important;outline:none !important;
+    color:var(--on-surface-variant) !important;transform:none !important;
 }
 [data-testid="stTooltipHoverTarget"] svg,
-[data-testid="stTooltipHoverTarget"] button svg {
-    width:17px !important;
-    height:17px !important;
-    color:#8b97a3 !important;
-    stroke:#8b97a3 !important;
-    fill:none !important;
+[data-testid="stTooltipHoverTarget"] button svg{
+    width:17px !important;height:17px !important;
+    color:var(--on-surface-variant) !important;stroke:var(--on-surface-variant) !important;fill:none !important;
 }
 
-/* Style plus/minus hanya untuk number input, bukan tooltip */
-[data-testid="stNumberInput"] button {
-    background:linear-gradient(135deg,#2563eb,#0f766e) !important;
-    color:#ffffff !important;
-    border:0 !important;
-    box-shadow:none !important;
+div[data-baseweb="popover"]{min-width:260px !important;width:auto !important;max-width:560px !important;}
+div[data-baseweb="popover"] [role="listbox"]{min-width:260px !important;width:auto !important;max-width:560px !important;overflow-x:hidden !important;}
+div[data-baseweb="popover"] [role="option"]{
+    min-height:38px !important;padding:9px 14px !important;
+    white-space:normal !important;overflow:visible !important;text-overflow:clip !important;line-height:1.35 !important;
+}
+div[data-baseweb="popover"] [role="option"] *{
+    white-space:normal !important;overflow:visible !important;text-overflow:clip !important;max-width:none !important;width:auto !important;line-height:1.35 !important;
+}
+[data-baseweb="select"] div, [data-baseweb="select"] span{white-space:nowrap !important;text-overflow:ellipsis !important;}
+
+/* ------------------------------------------------------------
+   Generic cards, kickers, glass pill
+------------------------------------------------------------ */
+.v12-card-title{
+    font-family:var(--sans);font-size:1.30rem;font-weight:800;color:var(--on-surface) !important;
+    background:none !important;-webkit-text-fill-color:initial !important;margin-bottom:6px;
+}
+.v12-card-sub{color:var(--on-surface-variant);font-size:.92rem;line-height:1.6;}
+
+.v40-panel{
+    position:relative;overflow:hidden;
+    background:var(--primary-deep);
+    background-image:var(--blueprint);background-repeat:no-repeat;background-position:right -20px bottom -30px;
+    color:#fff;border-radius:var(--radius-lg);padding:26px 28px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.10), var(--shadow-lg);
+}
+.v40-section-kicker{
+    display:inline-flex;align-items:center;gap:8px;padding:6px 13px;border-radius:999px;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;
+    font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+}
+.v40-panel-title{
+    font-family:var(--sans);font-size:1.45rem;font-weight:800;color:#fff !important;
+    background:none !important;-webkit-text-fill-color:#fff !important;
+}
+.v40-panel-sub{color:rgba(255,255,255,.80);font-weight:550;line-height:1.6;margin-top:4px;max-width:760px;}
+
+.v40-footer{
+    margin:34px 0 8px 0;padding-top:16px;border-top:1px solid var(--outline);
+    color:var(--on-surface-variant);font-size:.80rem;font-weight:600;text-align:center;
 }
 
-/* Fix dropdown list yang jadi S.. / K.. */
-div[data-baseweb="popover"] {
-    min-width:260px !important;
-    width:auto !important;
-    max-width:520px !important;
+.mp-glass-pill{
+    display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;
+    gap:4px 12px;max-width:100%;box-sizing:border-box;
+    padding:10px 18px;border-radius:999px;font-size:.82rem;font-weight:700;color:var(--on-surface);
+    background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.75);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 6px 16px rgba(11,17,45,.08);
+    backdrop-filter:blur(10px) saturate(1.6);-webkit-backdrop-filter:blur(10px) saturate(1.6);
 }
-div[data-baseweb="popover"] [role="listbox"] {
-    min-width:260px !important;
-    width:auto !important;
-    max-width:520px !important;
-    overflow-x:hidden !important;
+.mp-glass-pill b{color:var(--primary-deep);}
+.mp-glass-pill .mp-glass-item{white-space:nowrap;}
+
+/* ------------------------------------------------------------
+   Profile page
+------------------------------------------------------------ */
+.v12-hero-premium{
+    position:relative;overflow:hidden;border-radius:var(--radius-lg);padding:30px;
+    background:var(--primary-deep);
+    background-image:var(--blueprint);background-repeat:no-repeat;background-position:right -20px top -20px;
+    color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.10), var(--shadow-lg);
 }
-div[data-baseweb="popover"] [role="option"] {
-    min-height:38px !important;
-    padding:9px 14px !important;
-    white-space:normal !important;
-    overflow:visible !important;
-    text-overflow:clip !important;
-    line-height:1.35 !important;
+.v12-hero-content{position:relative;z-index:1;}
+.v12-kicker{
+    display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;
+    font-weight:800;font-size:.74rem;letter-spacing:.05em;text-transform:uppercase;margin-bottom:18px;
 }
-div[data-baseweb="popover"] [role="option"] * {
-    white-space:normal !important;
-    overflow:visible !important;
-    text-overflow:clip !important;
-    max-width:none !important;
-    width:auto !important;
-    line-height:1.35 !important;
+.v12-hero-title{
+    font-family:var(--sans);font-weight:800;font-size:2.15rem;line-height:1.12;letter-spacing:-.02em;margin:0 0 12px 0;
+    color:#fff !important;background:none !important;-webkit-text-fill-color:#fff !important;
+}
+.v12-hero-desc{max-width:96%;font-size:.98rem;line-height:1.7;color:#D7E3FF;font-weight:500;margin-bottom:18px;}
+.v12-feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
+.v12-feature-card{
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.20);
+    border-radius:var(--radius-md);padding:14px 15px;min-height:82px;
+}
+.v12-feature-card b{display:block;font-size:.92rem;color:#fff;font-weight:750;margin-bottom:5px;}
+.v12-feature-card span{font-size:.80rem;line-height:1.4;color:#B9CBF2;font-weight:500;}
+.v12-feature-chip{
+    display:inline-flex;align-items:center;margin:6px 6px 0 0;padding:7px 12px;border-radius:999px;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.20);
+    color:#fff;font-size:.78rem;font-weight:650;
 }
 
-/* Pastikan teks pilihan yang dipilih dalam kotak select tidak terpotong pelik */
-[data-baseweb="select"] div,
-[data-baseweb="select"] span {
-    white-space:nowrap !important;
-    text-overflow:ellipsis !important;
+.v36-mini-result{
+    margin-top:14px;background:var(--surface-card);border:1px solid var(--outline);border-radius:var(--radius-md);
+    padding:14px 16px;box-shadow:var(--shadow-sm);
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+.v36-mini-left{display:flex;align-items:center;gap:12px;min-width:0;}
+.v36-mini-icon{width:8px;height:8px;border-radius:2px;background:var(--primary);flex:0 0 8px;}
+.v36-mini-title{color:var(--on-surface);font-size:1rem;font-weight:750;margin-bottom:2px;}
+.v36-mini-sub{color:var(--on-surface-variant);font-size:.82rem;font-weight:550;line-height:1.35;}
+.v36-mini-badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:8px 14px;border-radius:8px;color:#fff;font-size:.82rem;font-weight:800;white-space:nowrap;
+    font-family:var(--mono);
 }
 
+.v36-modal-card{background:var(--surface-card);border:1px solid var(--outline);border-radius:var(--radius-lg);padding:20px;}
+.v36-modal-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.v36-modal-head{display:flex;align-items:center;gap:11px;min-width:0;}
+.v36-modal-icon{width:8px;height:8px;border-radius:2px;background:var(--primary);flex:0 0 8px;}
+.v36-modal-title{font-family:var(--sans);font-size:1.12rem;font-weight:800;color:var(--on-surface);letter-spacing:-.01em;line-height:1.2;margin-bottom:2px;}
+.v36-modal-desc{color:var(--on-surface-variant);font-size:.80rem;font-weight:550;line-height:1.4;}
+.v36-level-pill{
+    display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+    min-width:100px;padding:10px 12px;border-radius:var(--radius-sm);color:#fff;font-family:var(--mono);
+}
+.v36-level-pill small{font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700;opacity:.9;line-height:1;font-family:var(--sans);}
+.v36-level-pill b{font-size:1.12rem;font-weight:800;margin:4px 0 2px;line-height:1;}
+.v36-quick-note{
+    background:var(--primary-container);border:1px solid var(--outline);color:var(--on-primary-container);
+    border-radius:var(--radius-sm);padding:11px 13px;font-weight:600;line-height:1.5;font-size:.85rem;margin-bottom:13px;
+}
+.v36-prob-title{color:var(--on-surface-variant);font-weight:750;font-size:.82rem;margin:2px 0 9px;}
+.v36-prob-card{padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:8px;border:1px solid var(--outline);background:var(--surface-card);}
+.v36-prob-card.selected{border-width:1.6px;background:var(--primary-container);}
+.v36-prob-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px;}
+.v36-prob-label{display:flex;align-items:center;gap:7px;font-weight:750;color:var(--on-surface);font-size:.82rem;}
+.v36-selected-chip{font-size:9px;font-weight:800;padding:3px 7px;border-radius:999px;background:var(--primary);color:#fff;}
+.v36-prob-track{width:100%;height:8px;border-radius:4px;background:var(--surface-alt);overflow:hidden;}
+.v36-prob-fill{height:100%;border-radius:4px;}
+.v36-modal-footer-note{margin-top:10px;color:var(--on-surface-variant);font-size:.74rem;font-weight:550;line-height:1.4;text-align:center;}
+@media(max-width:700px){.v36-modal-top{align-items:flex-start;}.v36-level-pill{min-width:88px;}}
 
+/* ------------------------------------------------------------
+   Dashboard
+------------------------------------------------------------ */
+.v43-welcome-hero{
+    position:relative;overflow:hidden;border-radius:var(--radius-lg);padding:32px 36px;margin:16px 0 22px;
+    background:var(--primary-deep);
+    background-image:var(--blueprint);background-repeat:no-repeat;background-position:right -20px top -20px;
+    color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.10), var(--shadow-lg);
+}
+.v43-hero-inner{position:relative;z-index:1;display:grid;grid-template-columns:1.25fr 1fr;gap:24px;align-items:end;}
+.v43-hero-kicker{
+    display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:999px;padding:7px 13px;
+    font-size:.74rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:14px;
+}
+.v43-hero-title{
+    font-family:var(--sans);font-weight:800;font-size:2.35rem;line-height:1.08;letter-spacing:-.02em;
+    color:#fff !important;background:none !important;-webkit-text-fill-color:#fff !important;margin:0 0 12px;
+}
+.v43-hero-copy{max-width:520px;color:#D7E3FF;font-weight:500;line-height:1.65;margin:0;font-size:1rem;}
+.v43-hero-metrics{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.v43-hero-metric{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.20);border-radius:var(--radius-md);padding:16px;}
+.v43-hero-metric small{display:block;color:#AFC4F5;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.v43-hero-metric b{display:block;color:#fff;font-size:1.35rem;font-weight:700;font-family:var(--mono);}
 
-/* V34 FINAL FIX: tooltip/help icon (?) inside number input must stay grey circle, not blue square */
-[data-testid="stNumberInput"] [data-testid="stTooltipHoverTarget"],
-[data-testid="stSelectbox"] [data-testid="stTooltipHoverTarget"],
-[data-testid="stTextInput"] [data-testid="stTooltipHoverTarget"] {
-    display:inline-flex !important;
-    align-items:center !important;
-    justify-content:center !important;
-    width:18px !important;
-    height:18px !important;
-    min-width:18px !important;
-    min-height:18px !important;
-    max-width:18px !important;
-    max-height:18px !important;
-    padding:0 !important;
-    margin-left:6px !important;
-    border-radius:50% !important;
-    background:transparent !important;
-    border:0 !important;
-    box-shadow:none !important;
+.v43-step-grid{position:relative;z-index:1;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:26px;}
+.v43-step{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:13px;padding:12px;}
+.v43-step-num{
+    width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    color:var(--on-accent);font-weight:700;background:var(--accent);font-size:.72rem;margin-bottom:8px;font-family:var(--mono);
+}
+.v43-step b{display:block;color:#fff;font-size:.78rem;margin-bottom:3px;}
+.v43-step span{display:block;color:#B9CBF2;font-size:.70rem;font-weight:500;line-height:1.4;}
+
+.v43-dashboard-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start;}
+.v43-setup-card{border-radius:var(--radius-lg);background:var(--surface-card);border:1px solid var(--outline);box-shadow:var(--shadow-sm);padding:26px;}
+.v43-setup-intro{border-radius:var(--radius-md);background:var(--surface-alt);border:1px solid var(--outline);padding:20px;margin-bottom:20px;}
+.v43-setup-kicker{
+    display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;
+    background:var(--primary-container);color:var(--on-primary-container);
+    font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;
+}
+.v43-setup-title{font-family:var(--sans);font-size:1.32rem;font-weight:800;letter-spacing:-.01em;color:var(--on-surface);margin:0 0 7px;}
+.v43-setup-sub{color:var(--on-surface-variant);font-weight:550;line-height:1.6;margin:0 0 14px;max-width:780px;}
+.v43-control-title{
+    display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;
+    background:var(--primary-container);color:var(--on-primary-container);
+    font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:10px 0;
+}
+.v43-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0;}
+.v43-stat-box{background:var(--surface);border:1px solid var(--outline);border-left:3px solid var(--primary);border-radius:var(--radius-md);padding:14px 16px;}
+.v43-stat-box small{display:block;color:var(--on-surface-variant);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:7px;}
+.v43-stat-box b{display:block;color:var(--on-surface);font-size:1.05rem;font-weight:700;line-height:1.2;font-family:var(--mono);}
+.v43-summary-note{
+    margin:18px 0;padding:16px 18px;border-radius:var(--radius-md);
+    background:var(--surface-alt);border:1px solid var(--outline);color:var(--on-surface-variant);font-weight:550;line-height:1.7;
+}
+.v43-summary-note b{color:var(--on-surface);}
+.v43-student-card{border-radius:var(--radius-lg);background:var(--surface-card);border:1px solid var(--outline);box-shadow:var(--shadow-sm);overflow:hidden;}
+.v43-student-head{
+    position:relative;overflow:hidden;padding:22px;
+    background:var(--primary-deep);
+    background-image:var(--blueprint);background-repeat:no-repeat;background-position:right -30px bottom -40px;
+}
+.v43-student-flex{position:relative;z-index:1;display:flex;gap:14px;align-items:center;}
+.v43-avatar{
+    width:46px;height:46px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.26);color:#fff;font-weight:700;font-size:1rem;font-family:var(--mono);
+}
+.v43-student-flex h3{margin:0 !important;color:#fff !important;background:none !important;-webkit-text-fill-color:#fff !important;font-size:1.10rem !important;}
+.v43-student-flex p{margin:3px 0 0;color:#B9CBF2;font-size:.78rem;font-weight:550;}
+.v43-current-level{margin:18px;display:flex;justify-content:center;}
+.v43-level-icon{display:none;}
+.v43-info-list{padding:6px 20px 18px;display:grid;gap:9px;}
+.v43-info-item{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    background:var(--surface);border:1px solid var(--outline);border-radius:var(--radius-sm);padding:12px 14px;
+}
+.v43-info-item span{color:var(--on-surface-variant);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.02em;}
+.v43-info-item b{color:var(--on-surface);font-size:.92rem;text-align:right;font-family:var(--mono);}
+.v43-side-actions{padding:0 20px 20px;display:grid;gap:10px;}
+@media(max-width:940px){
+    .v43-hero-inner,.v43-dashboard-grid{grid-template-columns:1fr;}
+    .v43-hero-metrics,.v43-step-grid,.v43-stat-row{grid-template-columns:1fr;}
 }
 
-[data-testid="stNumberInput"] [data-testid="stTooltipHoverTarget"] button,
-[data-testid="stSelectbox"] [data-testid="stTooltipHoverTarget"] button,
-[data-testid="stTextInput"] [data-testid="stTooltipHoverTarget"] button,
-[data-testid="stNumberInput"] [data-testid="stTooltipHoverTarget"] button:hover,
-[data-testid="stSelectbox"] [data-testid="stTooltipHoverTarget"] button:hover,
-[data-testid="stTextInput"] [data-testid="stTooltipHoverTarget"] button:hover,
-[data-testid="stNumberInput"] [data-testid="stTooltipHoverTarget"] button:focus,
-[data-testid="stSelectbox"] [data-testid="stTooltipHoverTarget"] button:focus,
-[data-testid="stTextInput"] [data-testid="stTooltipHoverTarget"] button:focus {
-    width:18px !important;
-    height:18px !important;
-    min-width:18px !important;
-    min-height:18px !important;
-    max-width:18px !important;
-    max-height:18px !important;
-    padding:0 !important;
-    margin:0 !important;
-    border-radius:50% !important;
-    background:transparent !important;
-    background-image:none !important;
-    border:0 !important;
-    box-shadow:none !important;
-    outline:none !important;
-    color:#8b97a3 !important;
-    transform:none !important;
+/* ------------------------------------------------------------
+   Quiz
+------------------------------------------------------------ */
+.v41-quiz-shell{
+    border-radius:var(--radius-lg);padding:20px 22px;background:var(--surface-card);border:1px solid var(--outline);
+    box-shadow:var(--shadow-sm);margin:14px 0 18px;
+}
+.v41-quiz-row{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;}
+.v41-quiz-title{font-family:var(--sans);font-size:1.16rem;font-weight:800;color:var(--on-surface);margin:0 0 5px;}
+.v41-quiz-sub{
+    display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 12px;max-width:100%;box-sizing:border-box;
+    color:var(--on-surface);font-weight:650;font-size:.84rem;
+    padding:9px 16px;border-radius:999px;margin-top:4px;
+    background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.80);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.8), 0 4px 14px rgba(11,17,45,.08);
+    backdrop-filter:blur(10px) saturate(1.6);-webkit-backdrop-filter:blur(10px) saturate(1.6);
+}
+.v41-quiz-sub b{color:var(--primary-deep);}
+.v41-quiz-sub .mp-glass-item{white-space:nowrap;}
+.v41-question-pill{
+    display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border-radius:8px;
+    background:var(--primary);color:#fff;font-weight:700;font-family:var(--mono);
+}
+.v41-progress-track{height:6px;border-radius:4px;background:var(--surface-alt);margin-top:16px;overflow:hidden;}
+.v41-progress-fill{height:100%;border-radius:4px;background:var(--primary);}
+
+.v27-meta-wrap{margin:0 0 14px 0;}
+.v27-question-card{background:var(--surface-card);border:1px solid var(--outline);border-radius:var(--radius-lg);padding:22px 24px;box-shadow:var(--shadow-sm);margin:0 0 14px 0;}
+.v27-question-title{font-size:1.12rem;font-weight:700;line-height:1.55;color:var(--on-surface);margin-bottom:16px;}
+.v27-answer-note{border-top:1px solid var(--outline);padding-top:13px;color:var(--on-surface-variant);font-weight:650;font-size:.85rem;}
+.v27-submit-gap{height:10px;}
+.v27-feedback{border-radius:var(--radius-md);padding:13px 15px;margin-top:14px;font-weight:550;line-height:1.55;}
+.v27-feedback.ok{background:var(--success-bg);color:var(--on-success);}
+.v27-feedback.warn{background:var(--warning-bg);color:var(--on-warning);}
+
+/* Tutor panel: a real Streamlit bordered container (not a raw div-wrap) so it
+   genuinely encloses the chat window and composer as one box in the DOM. */
+div[data-testid="stVerticalBlockBorderWrapper"].st-key-mp_tutor_panel{
+    position:sticky !important;top:96px !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"].st-key-mp_tutor_panel > div{
+    background:var(--surface-card) !important;border:1px solid var(--outline) !important;
+    border-top:3px solid var(--primary) !important;border-radius:var(--radius-lg) !important;
+    padding:18px 18px 16px 18px !important;box-shadow:var(--shadow-md) !important;
+}
+.st-key-mp_tutor_panel [data-testid="stForm"]{
+    background:transparent !important;border:0 !important;box-shadow:none !important;
+    padding:0 !important;margin-top:10px !important;
+}
+.st-key-mp_tutor_panel textarea{min-height:62px !important;}
+.v27-tutor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--outline);}
+.v27-tutor-title{display:inline-flex;align-items:center;gap:9px;font-family:var(--sans);font-size:1.10rem;font-weight:800;color:var(--on-surface);}
+.v27-tutor-title svg{flex:0 0 auto;color:#fff;background:var(--primary);border-radius:7px;padding:4px;box-sizing:content-box;}
+.v27-status{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;background:var(--success-bg);color:var(--on-success);font-size:.72rem;font-weight:750;white-space:nowrap;}
+.v27-status:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--on-success);}
+.v27-status.warn{background:var(--warning-bg);color:var(--on-warning);}
+.v27-status.warn:before{background:var(--on-warning);}
+.v27-tutor-desc{
+    background:var(--primary-container);border:1px solid var(--outline);color:var(--on-primary-container);
+    border-radius:var(--radius-sm);padding:11px 13px;font-weight:550;line-height:1.45;font-size:.84rem;margin-bottom:10px;
+}
+.v27-chat-window{
+    height:175px;max-height:175px;overflow-y:auto;background:var(--surface);border:1px solid var(--outline);
+    border-radius:var(--radius-md);padding:12px;box-sizing:border-box;margin:10px 0 12px 0;scrollbar-width:thin;
+    box-shadow:inset 0 2px 6px rgba(11,17,45,.06);
+}
+.v27-chat-window::-webkit-scrollbar{width:7px;}
+.v27-chat-window::-webkit-scrollbar-thumb{background:var(--outline-strong);border-radius:999px;}
+.v27-msg{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
+.v27-msg.user{align-items:flex-end;}
+.v27-msg.bot{align-items:flex-start;}
+.v27-avatar{display:inline-flex;align-items:center;gap:5px;font-size:.64rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:999px;}
+.v27-avatar.bot{background:var(--surface-alt);color:var(--on-surface-variant);}
+.v27-avatar.user{background:var(--primary-container);color:var(--on-primary-container);}
+.v27-avatar svg{color:var(--accent);}
+.v27-bubble{max-width:86%;padding:10px 13px;border-radius:var(--radius-sm);font-size:.83rem;line-height:1.5;font-weight:500;box-shadow:var(--shadow-sm);}
+.v27-bubble.bot{background:var(--surface-card);border:1px solid var(--outline);color:var(--on-surface);border-top-left-radius:4px;}
+.v27-bubble.user{background:var(--primary-deep);color:#fff;border-top-right-radius:4px;}
+@media(max-width:900px){
+    div[data-testid="stVerticalBlockBorderWrapper"].st-key-mp_tutor_panel{position:relative !important;top:0 !important;}
+    .v27-chat-window{height:160px;max-height:160px;}
+    .v27-question-card{padding:18px;}
 }
 
-[data-testid="stNumberInput"] [data-testid="stTooltipHoverTarget"] svg,
-[data-testid="stSelectbox"] [data-testid="stTooltipHoverTarget"] svg,
-[data-testid="stTextInput"] [data-testid="stTooltipHoverTarget"] svg,
-[data-testid="stNumberInput"] [data-testid="stTooltipHoverTarget"] button svg,
-[data-testid="stSelectbox"] [data-testid="stTooltipHoverTarget"] button svg,
-[data-testid="stTextInput"] [data-testid="stTooltipHoverTarget"] button svg {
-    width:17px !important;
-    height:17px !important;
-    color:#8b97a3 !important;
-    stroke:#8b97a3 !important;
-    fill:none !important;
+/* ------------------------------------------------------------
+   Results
+------------------------------------------------------------ */
+.v41-result-wrap{
+    position:relative;overflow:hidden;border-radius:var(--radius-lg);padding:34px;
+    background:var(--primary-deep);
+    background-image:var(--blueprint);background-repeat:no-repeat;background-position:right -20px top -20px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.10), var(--shadow-lg);text-align:center;margin:16px 0 22px;color:#fff;
+}
+.v41-result-wrap h2{position:relative;z-index:1;color:#fff !important;-webkit-text-fill-color:#fff !important;background:none !important;font-size:1.65rem !important;margin:6px 0 !important;}
+.v41-result-wrap p{position:relative;z-index:1;color:#D7E3FF;font-weight:550;margin:0 0 22px;}
+.v41-score-ring{
+    position:relative;z-index:1;width:auto;min-width:240px;height:auto;border-radius:var(--radius-lg);
+    margin:0 auto 24px;background:var(--surface-card);padding:22px 30px;
+    display:inline-flex;flex-direction:column;align-items:center;box-shadow:var(--shadow-md);border:1px solid var(--outline);
+}
+.v41-score-inner{width:auto;height:auto;border-radius:0;background:transparent;border:0;}
+.v41-score-value{font-family:var(--mono);font-weight:700;font-size:2.6rem;color:var(--primary-deep);line-height:1;}
+.v41-score-label{font-size:.72rem;font-weight:700;color:var(--on-surface-variant);letter-spacing:.05em;text-transform:uppercase;margin-top:8px;}
+.v41-result-grid{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:900px;margin:0 auto;}
+.v41-result-card{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.20);border-radius:var(--radius-md);padding:18px;}
+.v41-result-card b{display:block;font-size:1.30rem;color:#fff;font-family:var(--mono);}
+.v41-result-card span{display:block;color:#B9CBF2;font-weight:600;font-size:.80rem;margin-top:6px;}
+@media(max-width:900px){.v41-result-grid{grid-template-columns:1fr;}}
+
+/* ------------------------------------------------------------
+   Performance report
+------------------------------------------------------------ */
+.v24-performance-hero{
+    position:relative;overflow:hidden;
+    background:var(--primary-deep);
+    background-image:var(--blueprint);background-repeat:no-repeat;background-position:right -20px bottom -30px;
+    color:#fff;border-radius:var(--radius-lg);padding:26px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.10), var(--shadow-lg);margin-bottom:18px;
+}
+.v24-performance-hero h2{position:relative;z-index:1;color:#fff !important;-webkit-text-fill-color:#fff !important;background:none !important;margin:0 0 8px 0 !important;font-size:1.45rem !important;}
+.v24-performance-hero p{position:relative;z-index:1;color:#D7E3FF;font-weight:550;line-height:1.6;max-width:760px;margin:0;}
+.v24-soft-pill{
+    position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.24);color:#fff;border-radius:8px;padding:7px 12px;font-weight:700;font-size:.78rem;margin:4px 6px 4px 0;font-family:var(--mono);
+}
+/* on a light card (not the dark hero) the translucent-white pill is invisible; use the tonal variant instead */
+.v24-section-card .v24-soft-pill{
+    background:var(--primary-container);border-color:var(--outline);color:var(--on-primary-container);
+}
+.v24-metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0 20px 0;}
+.v24-metric-card{background:var(--surface-card);border:1px solid var(--outline);border-left:3px solid var(--primary);border-radius:var(--radius-md);padding:18px;box-shadow:var(--shadow-sm);}
+.v24-metric-card small{display:block;color:var(--on-surface-variant);font-weight:700;font-size:.74rem;margin-bottom:6px;}
+.v24-metric-card strong{font-family:var(--mono);display:block;color:var(--on-surface);font-size:1.45rem;font-weight:700;line-height:1.15;}
+.v24-metric-card span{display:block;color:var(--on-surface-variant);font-size:.76rem;font-weight:600;margin-top:6px;}
+.v24-section-card{background:var(--surface-card);border:1px solid var(--outline);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm);margin-bottom:16px;}
+.v24-section-card h3{font-family:var(--sans);color:var(--on-surface) !important;-webkit-text-fill-color:initial !important;background:none !important;margin:0 0 6px 0 !important;font-size:1.10rem !important;}
+.v24-section-card p{color:var(--on-surface-variant);font-weight:500;line-height:1.55;margin:0 0 12px 0;}
+@media(max-width:900px){.v24-metric-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.v24-metric-grid{grid-template-columns:1fr;}}
+
+/* ------------------------------------------------------------
+   Tables
+------------------------------------------------------------ */
+.mp-table-wrap{overflow-x:auto;border:1px solid var(--outline);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);margin-bottom:16px;}
+table.mp-table{width:100%;border-collapse:collapse;background:var(--surface-card);font-size:.86rem;}
+table.mp-table thead th{
+    background:var(--primary-deep);color:#fff;text-align:left;
+    font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
+    padding:11px 14px;white-space:nowrap;
+}
+table.mp-table tbody td{padding:10px 14px;color:var(--on-surface);border-top:1px solid var(--outline);font-family:var(--mono);white-space:nowrap;}
+table.mp-table tbody tr:nth-child(even){background:var(--surface-alt);}
+table.mp-table tbody tr:hover{background:var(--primary-container);}
+
+[data-testid="stDataFrame"]{
+    border:1px solid var(--outline) !important;
+    border-radius:var(--radius-md) !important;
+    box-shadow:var(--shadow-sm) !important;
+    overflow:hidden !important;
+}
+.js-plotly-plot, .stPlotlyChart, [data-testid="stImage"]{
+    border-radius:var(--radius-md) !important;
+    border:1px solid var(--outline) !important;
 }
 </style>
 """, unsafe_allow_html=True)
-
-
-# ------------------------------------------------------------
-# Pemuatan Model dan Data 
-# ------------------------------------------------------------
-@st.cache_resource
-def load_model_bundle():
-    if MODEL_PATH.exists():
-        try:
-            return joblib.load(MODEL_PATH)
-        except Exception as e:
-            st.error(f"Gagal memuatkan model bundle: {e}")
-    return None
 
 @st.cache_data
 def load_questions():
@@ -1239,107 +787,103 @@ def load_questions():
         st.error(f"Gagal memuatkan Bank Soalan: {e}")
         return pd.DataFrame()
 
-@st.cache_data
-def load_metrics():
-    import json
-    summary_path = Path("models") / "metrics_summary.json"
-    if summary_path.exists():
-        with open(summary_path, "r", encoding="utf-8") as f:
-            summary = json.load(f)
-        final_model = summary.get("final_model", "Hybrid RF-DNN")
-        rows = summary.get("results", [])
-        for row in rows:
-            if row.get("Model") == final_model and row.get("Dataset") == "Test":
-                return {"test": {"accuracy": float(row.get("Accuracy", 0))}, "summary": summary}
-        return {"test": {"accuracy": 0}, "summary": summary}
-    old_path = Path("models") / "metrics.json"
-    if old_path.exists():
-        with open(old_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+# ------------------------------------------------------------
+# Ramalan Aras Awal (Model Hibrid RF-DNN)
+# ------------------------------------------------------------
+# Trained by train_model.py. ExamScore is banded into 4 coarse categories rather than used as
+# a precise 0-100 value: the raw score has ~0.97 correlation with the label (see train_model.py's
+# ExamScore audit), so using it directly would make the model a trivial 100%-accuracy lookup
+# with the behavioral features contributing nothing. Banding keeps ExamScore as the dominant,
+# honest signal while leaving two of the four bands genuinely ambiguous, so the behavioral
+# features have real (if modest) influence -- and heavier MLP regularization plus sigmoid
+# calibration keep that influence smooth and the reported confidence realistic.
+MODEL_PATH = Path("models") / "hybrid_rf_dnn_bundle.pkl"
+
+
+@st.cache_resource
+def load_model_bundle():
+    if MODEL_PATH.exists():
+        try:
+            return joblib.load(MODEL_PATH)
+        except Exception as e:
+            st.error(f"Gagal memuatkan model bundle: {e}")
     return None
 
-# ------------------------------------------------------------
-# Ramalan Pembelajaran Mesin
-# ------------------------------------------------------------
+
+METRICS_PATH = Path("models") / "metrics.json"
+
+
+@st.cache_data
+def load_model_accuracy():
+    if not METRICS_PATH.exists():
+        return None
+    try:
+        with open(METRICS_PATH, "r", encoding="utf-8") as f:
+            metrics = json.load(f)
+        if "test" in metrics and "accuracy" in metrics["test"]:
+            return f"{float(metrics['test']['accuracy']):.2%}"
+        results = metrics.get("results") or metrics.get("summary", {}).get("results", [])
+        for row in results:
+            if row.get("Dataset") == "Test" and row.get("Model") == "Hybrid RF-DNN":
+                return f"{float(row['Accuracy']):.2%}"
+    except Exception:
+        return None
+    return None
+
+
+def exam_score_to_band(score):
+    score = clamp(float(score), 0, 100)
+    if score <= 40:
+        return 0
+    if score <= 60:
+        return 1
+    if score <= 80:
+        return 2
+    return 3
 
 
 def predict_competency(profile_dict):
     bundle = load_model_bundle()
-    feature_cols = [
-        "StudyHours", "Attendance", "Resources", "Extracurricular", "Motivation",
-        "Internet", "Gender", "Age", "LearningStyle", "OnlineCourses",
-        "Discussions", "AssignmentCompletion", "ExamScore", "EduTech", "StressLevel"
-    ]
 
     def sandaran_prediction():
-        score = float(profile_dict.get("ExamScore", 50))
-        if score < 40:
-            return 0, "Rendah", 0.60, [0.60, 0.30, 0.10]
-        elif score < 75:
-            return 1, "Sederhana", 0.60, [0.20, 0.60, 0.20]
-        else:
-            return 2, "Tinggi", 0.60, [0.10, 0.20, 0.70]
+        # Deterministic, smooth fallback used only if the trained bundle can't be loaded.
+        score = clamp(float(profile_dict.get("ExamScore", 50)), 0, 100)
+        band_centers = {0: 27.5, 1: 70.0, 2: 92.5}
+        temperature = 18.0
+        raw = {lvl: -abs(score - center) / temperature for lvl, center in band_centers.items()}
+        max_raw = max(raw.values())
+        exp_scores = {lvl: math.exp(v - max_raw) for lvl, v in raw.items()}
+        total = sum(exp_scores.values())
+        probs = {lvl: v / total for lvl, v in exp_scores.items()}
+        pred_class = max(probs, key=probs.get)
+        return pred_class, [probs[0], probs[1], probs[2]]
 
     if not bundle:
-        return sandaran_prediction()
-
-    try:
-        # Model dilatih menggunakan dataset proksi yang umur minimumnya bermula sekitar 18 tahun.
-        # Oleh itu, umur pelajar F4/F5 yang bawah 18 tahun distandardkan kepada 18 untuk ramalan model
-        # supaya input tidak terlalu jauh daripada julat data latihan. Umur asal masih kekal dalam rekod profil sistem.
-        model_profile = dict(profile_dict)
+        pred_class, probs = sandaran_prediction()
+    else:
         try:
-            if float(model_profile.get("Age", 18)) < 18:
-                model_profile["Age"] = 18
-        except Exception:
-            model_profile["Age"] = 18
-
-        df_in = pd.DataFrame([model_profile])
-
-        # Latest local deployment bundle: preprocessor + RF probabilities + hybrid MLP/DNN.
-        if isinstance(bundle, dict) and "preprocessor" in bundle and "rf_model" in bundle and "hybrid_model" in bundle:
-            X_proc = bundle["preprocessor"].transform(df_in)
-            rf_probs = bundle["rf_model"].predict_proba(X_proc)
+            model_profile = dict(profile_dict)
             try:
-                from scipy.sparse import hstack, csr_matrix
-                X_hybrid = hstack([csr_matrix(X_proc), csr_matrix(rf_probs)])
-                if hasattr(X_hybrid, "toarray"):
-                    X_hybrid = X_hybrid.toarray()
+                if float(model_profile.get("Age", 18)) < 18:
+                    model_profile["Age"] = 18
             except Exception:
-                X_dense = X_proc.toarray() if hasattr(X_proc, "toarray") else np.asarray(X_proc)
-                X_hybrid = np.hstack([X_dense, rf_probs])
+                model_profile["Age"] = 18
+            model_profile["ExamBand"] = exam_score_to_band(model_profile.get("ExamScore", 50))
+
+            df_in = pd.DataFrame([model_profile])[bundle["feature_cols"]]
+            X_proc = bundle["preprocessor"].transform(df_in)
+            X_proc = X_proc.toarray() if hasattr(X_proc, "toarray") else np.asarray(X_proc)
+            rf_probs = bundle["rf_model"].predict_proba(X_proc)
+            X_hybrid = np.hstack([X_proc, rf_probs])
             pred_prob = bundle["hybrid_model"].predict_proba(X_hybrid)[0]
             pred_class = int(np.argmax(pred_prob))
-            conf = float(pred_prob[pred_class])
-            label_map = bundle.get("level_decoding", LEVEL_TEXT)
-            return pred_class, LEVEL_TEXT[pred_class], conf, list(pred_prob)
+            probs = list(pred_prob)
+        except Exception as e:
+            st.warning(f"Ralat ramalan model: {e}. Sistem menggunakan logik sandaran sementara.")
+            pred_class, probs = sandaran_prediction()
 
-        # Older local bundle support: imputer + scaler + RF + DNN model.
-        if isinstance(bundle, dict) and "imputer" in bundle and "scaler" in bundle:
-            input_row = [[model_profile[c] for c in feature_cols]]
-            X_imp = bundle["imputer"].transform(input_row)
-            X_sc = bundle["scaler"].transform(X_imp)
-            rf_key = "rf_model" if "rf_model" in bundle else "rf"
-            dnn_key = "dnn_model" if "dnn_model" in bundle else "dnn"
-            rf_probs = bundle[rf_key].predict_proba(X_sc)
-            if dnn_key in bundle:
-                # Some older bundles train DNN directly on RF probabilities only.
-                try:
-                    pred_prob = bundle[dnn_key].predict_proba(rf_probs)[0]
-                except Exception:
-                    X_hybrid = np.hstack([X_sc, rf_probs])
-                    pred_prob = bundle[dnn_key].predict_proba(X_hybrid)[0]
-            else:
-                pred_prob = rf_probs[0]
-            pred_class = int(np.argmax(pred_prob))
-            conf = float(pred_prob[pred_class])
-            return pred_class, LEVEL_TEXT[pred_class], conf, list(pred_prob)
-
-        return sandaran_prediction()
-
-    except Exception as e:
-        st.warning(f"Ralat ramalan model: {e}. Sistem menggunakan logik sandaran sementara.")
-        return sandaran_prediction()
+    conf = float(probs[pred_class])
+    return pred_class, LEVEL_TEXT[pred_class], conf, probs
 
 # ------------------------------------------------------------
 # Logik Enjin Adaptif FSRS
@@ -1418,7 +962,8 @@ def openai_is_configured():
         return False
 
 SYSTEM_PROMPT_SOCRATIC = """
-Anda ialah Tutor Pintar Sokratik bagi Sistem Pembelajaran Adaptif Matematik untuk Tingkatan 4 dan Tingkatan 5 di Malaysia. Tahap penguasaan semasa pelajar ialah {current_level_text}.
+Anda ialah Tutor Pintar Sokratik bagi Sistem Pembelajaran Adaptif Matematik untuk Tingkatan 4 dan Tingkatan 5 di Malaysia. 
+Tahap penguasaan semasa pelajar ialah {current_level_text}.
 
 Gaya perbualan:
 - Gunakan Bahasa Melayu sepenuhnya. Jangan campur Bahasa Inggeris kecuali istilah teknikal yang tiada padanan sesuai.
@@ -1506,7 +1051,7 @@ def get_socratic_reply(question_row, student_message, current_level_text):
     api_key = api_key or os.getenv("OPENAI_API_KEY")
     
     if not api_key:
-        return "⚠️ Kunci API OpenAI tidak dikesan dalam folder sistem ini, jadi Tutor Pintar menggunakan mod sandaran tempatan.\n\n" + sandaran_socratic_reply(question, student_message)
+        return "Kunci API OpenAI tidak dikesan dalam folder sistem ini, jadi Tutor Pintar menggunakan mod sandaran tempatan.\n\n" + sandaran_socratic_reply(question, student_message)
 
     try:
         from openai import OpenAI
@@ -1577,6 +1122,7 @@ def init_session_state():
         "selected_topic": "",
         "show_hint_popup": False,
         "current_hint_text": "",
+        "show_prediction_popup": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1659,36 +1205,60 @@ def pilih_soalan_adaptif(pool_records, target_level, used_ids):
 # ------------------------------------------------------------
 # Page components
 # ------------------------------------------------------------
+def load_logo_markup():
+    """Papar logo tersuai (assets/logo.*) jika wujud; jika tidak, guna tanda grafik lalai."""
+    if LOGO_PATH is None:
+        return f'<div class="v12-logo">{LOGO_MARK_SVG}</div>'
+    import base64
+    import mimetypes
+    mime = mimetypes.guess_type(str(LOGO_PATH))[0] or "image/png"
+    data = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+    return f'<div class="v12-logo v12-logo-img"><img src="data:{mime};base64,{data}" alt="Logo"/></div>'
+
 def app_topbar(section_title):
-    user_badge = f"<span class='v12-user-pill'>👤 {st.session_state.username}</span>" if st.session_state.logged_in else ""
+    """Topbar + aligned navigation.
+    Fungsi routing kekal sama; hanya paparan bar atas dan butang navigasi diperhalusi.
+    """
+    user_badge = f"<span class='v12-user-pill'>{html.escape(str(st.session_state.username))}</span>" if st.session_state.logged_in else ""
+    logo_markup = load_logo_markup()
     st.markdown(f"""
     <div class="v12-topbar">
         <div class="v12-brand">
-            <div class="v12-logo">📘</div>
+            {logo_markup}
             <div>
                 <div class="v12-brand-title">Matematik Pintar SPM</div>
-                <div class="v12-brand-sub">Pembelajaran adaptif Matematik Tingkatan 4 dan 5</div>
+                <div class="v12-brand-sub">Pembelajaran Adaptif Matematik SPM</div>
             </div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
             <span class="v12-section-pill">{section_title}</span>
             {user_badge}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    nav1, nav2, nav3, nav4, nav5 = st.columns(5)
-    section = section_title.replace(" ", "_").lower()
-    with nav1:
-        if st.button("👤 Profil", key=f"top_prof_{section}", use_container_width=True): go_to("Profil")
-    with nav2:
-        if st.button("🏠 Papan Pemuka", key=f"top_dash_{section}", use_container_width=True): go_to("Papan Pemuka")
-    with nav3:
-        if st.button("🎯 Kuiz Adaptif", key=f"top_quiz_{section}", use_container_width=True): go_to("Kuiz Adaptif")
-    with nav4:
-        if st.button("📊 Prestasi", key=f"top_perf_{section}", use_container_width=True): go_to("Laporan Prestasi")
-    with nav5:
-        if st.button("🗄️ Pangkalan Data", key=f"top_db_{section}", use_container_width=True): go_to("Pangkalan Data")
+    pages = [
+        ("Profil", "Profil"),
+        ("Papan Pemuka", "Papan Pemuka"),
+        ("Kuiz Adaptif", "Kuiz Adaptif"),
+        ("Laporan Prestasi", "Laporan Prestasi"),
+        ("Pangkalan Data", "Rekod Pembelajaran"),
+    ]
+    nav_cols = st.columns(5, gap="small")
+    current_page = st.session_state.get("nav_page", "Profil")
+    safe_section = section_title.replace(" ", "_").replace("&", "dan").lower()
+    for col, (page_name, label) in zip(nav_cols, pages):
+        is_active = (current_page == page_name)
+        with col:
+            if st.button(label, key=f"top_nav_{safe_section}_{page_name}", use_container_width=True,
+                         type=("primary" if is_active else "secondary")):
+                if current_page != page_name:
+                    go_to(page_name)
+                    st.rerun()
+
+
+def app_footer():
+    st.markdown('<div class="v40-footer">Matematik Pintar SPM · Marsya Aneesa · 2026</div>', unsafe_allow_html=True)
 
 def live_timer_component(start_time, max_time, key_suffix=""):
     start_ms = int(float(start_time) * 1000)
@@ -1698,37 +1268,35 @@ def live_timer_component(start_time, max_time, key_suffix=""):
     <html>
     <head>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Space+Grotesk:wght@700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=IBM+Plex+Mono:wght@600;700&display=swap');
         html, body {{ margin:0; padding:0; background:transparent; overflow:hidden; }}
         * {{ box-sizing:border-box; }}
         .timer {{
             width:100%;
             min-height:96px;
-            border-radius:24px;
+            border-radius:16px;
             padding:16px 18px;
             display:flex;
             align-items:center;
             justify-content:space-between;
             gap:16px;
-            background:linear-gradient(135deg,#082f49 0%,#1d4ed8 58%,#14b8a6 100%);
-            color:#ffffff;
-            box-shadow:0 20px 42px rgba(37,99,235,.23);
-            border:1px solid rgba(255,255,255,.22);
-            font-family:Inter,Arial,sans-serif;
+            background:#0B2E6B;
+            color:#FFFFFF;
+            border:1px solid rgba(242,153,74,.35);
+            font-family:Manrope,Arial,sans-serif;
         }}
         .left {{ display:flex;align-items:center;gap:12px; }}
-        .icon {{ width:46px;height:46px;border-radius:16px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:24px; }}
-        .label {{ font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#dbeafe; }}
-        .sub {{ font-size:12px;font-weight:800;color:#ccfbf1;margin-top:3px; }}
-        .time {{ font-family:'Space Grotesk',Arial,sans-serif;font-size:2.25rem;font-weight:900;letter-spacing:-.04em;line-height:1; }}
-        .warn .time {{ color:#fecaca; }}
-        .warn .sub {{ color:#fee2e2; }}
+        .label {{ font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#AFC4F5; }}
+        .sub {{ font-size:12px;font-weight:700;color:#AFC4F5;margin-top:3px; }}
+        .time {{ font-family:'IBM Plex Mono',Manrope,Arial,monospace;font-size:2.1rem;font-weight:700;letter-spacing:-.01em;line-height:1;color:#FFFFFF; }}
+        .warn {{ background:#7A2E1D; }}
+        .warn .time {{ color:#FFE3C2; }}
+        .warn .sub {{ color:#FFE3C2; }}
     </style>
     </head>
     <body>
         <div id="timerBox{key_suffix}" class="timer">
             <div class="left">
-                <div class="icon">⏱️</div>
                 <div>
                     <div class="label">Pemasa Kuiz</div>
                     <div id="timerSub{key_suffix}" class="sub">Had masa: {max_s}s</div>
@@ -1777,8 +1345,8 @@ def quiz_meta_timer_component(topic, difficulty, start_time, max_time, key_suffi
     <html>
     <head>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Space+Grotesk:wght@700;800;900&display=swap');
-        html, body {{ margin:0; padding:0; background:transparent; overflow:hidden; font-family:Inter,Arial,sans-serif; }}
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=IBM+Plex+Mono:wght@600;700&display=swap');
+        html, body {{ margin:0; padding:0; background:transparent; overflow:hidden; font-family:Manrope,Arial,sans-serif; }}
         * {{ box-sizing:border-box; }}
         .bar {{
             display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -1786,31 +1354,29 @@ def quiz_meta_timer_component(topic, difficulty, start_time, max_time, key_suffi
         }}
         .chip {{
             display:inline-flex; align-items:center; gap:7px;
-            height:42px; padding:0 15px; border-radius:999px;
-            border:1px solid #bfdbfe; background:rgba(255,255,255,.86);
-            color:#1e40af; font-size:13px; font-weight:900;
-            box-shadow:0 10px 22px rgba(37,99,235,.07);
+            height:42px; padding:0 15px; border-radius:10px;
+            border:1px solid #C6D2EE; background:#FFFFFF;
+            color:#10193A; font-size:13px; font-weight:700;
             white-space:nowrap;
         }}
-        .level {{ color:#0f766e; border-color:#99f6e4; background:#ecfdf5; }}
+        .level {{ color:#001B4D; border-color:#C6D2EE; background:#D6E4FF; }}
         .timer {{
             display:inline-flex; align-items:center; gap:8px;
-            height:42px; padding:0 14px; border-radius:999px;
-            background:linear-gradient(135deg,#082f49 0%,#1d4ed8 55%,#14b8a6 100%);
-            color:#ffffff; font-weight:900;
-            box-shadow:0 12px 26px rgba(37,99,235,.18);
+            height:42px; padding:0 14px; border-radius:10px;
+            background:#0B2E6B;
+            color:#FFFFFF; font-weight:700;
             white-space:nowrap;
         }}
-        .timer small {{ font-size:11px; opacity:.9; font-weight:900; letter-spacing:.02em; }}
-        .timer b {{ font-family:'Space Grotesk',Arial,sans-serif; font-size:17px; letter-spacing:-.02em; }}
-        .warn {{ background:linear-gradient(135deg,#7f1d1d 0%,#dc2626 60%,#f97316 100%); }}
+        .timer small {{ font-size:11px; opacity:.85; font-weight:700; letter-spacing:.02em; }}
+        .timer b {{ font-family:'IBM Plex Mono',Manrope,Arial,monospace; font-size:17px; letter-spacing:-.01em; }}
+        .warn {{ background:#7A2E1D; }}
     </style>
     </head>
     <body>
         <div class="bar">
-            <div class="chip">📋 Topik: {topic_safe}</div>
-            <div class="chip level">📊 Aras Soalan: {difficulty_safe}</div>
-            <div id="timerBox{key_suffix}" class="timer"><span>⏱️</span><small>Pemasa</small><b id="timerText{key_suffix}">--:--</b></div>
+            <div class="chip">Topik: {topic_safe}</div>
+            <div class="chip level">Aras Soalan: {difficulty_safe}</div>
+            <div id="timerBox{key_suffix}" class="timer"><small>Pemasa</small><b id="timerText{key_suffix}">--:--</b></div>
         </div>
         <script>
             const start{key_suffix} = {start_ms};
@@ -1836,6 +1402,105 @@ def quiz_meta_timer_component(topic, difficulty, start_time, max_time, key_suffi
 # ------------------------------------------------------------
 # Pages functions
 # ------------------------------------------------------------
+def get_prediction_insight(pred):
+    return {
+        0: "Sistem mencadangkan pelajar bermula dengan soalan berpandu dan pengukuhan asas sebelum bergerak ke topik yang lebih mencabar.",
+        1: "Sistem mencadangkan pelajar bermula dengan soalan sederhana dan menaikkan kesukaran apabila jawapan betul serta pantas.",
+        2: "Sistem mencadangkan pelajar bermula dengan soalan aras tinggi dan mengekalkan cabaran melalui perkembangan adaptif.",
+    }.get(int(pred), "Laluan pembelajaran adaptif akan dilaraskan semasa kuiz berdasarkan prestasi pelajar.")
+
+def build_prediction_result_html(pred, probs):
+    pred = int(pred)
+    probs = list(probs) if probs is not None else [0.0, 0.0, 0.0]
+    if len(probs) < 3:
+        probs = [0.0, 0.0, 0.0]
+        probs[pred] = float(st.session_state.get("confidence", 0.0) or 0.0)
+
+    confidence_pct = float(probs[pred]) * 100
+    short_note = {
+        0: "Mula dengan asas dan bina keyakinan secara berperingkat.",
+        1: "Mula dengan soalan sederhana dan naik aras jika jawapan konsisten.",
+        2: "Mula dengan soalan mencabar dan kekalkan latihan aras tinggi.",
+    }.get(pred, "Sistem akan melaras aras semasa kuiz berdasarkan prestasi pelajar.")
+
+    prob_html_parts = []
+    for i in [0, 1, 2]:
+        percentage = float(probs[i]) * 100
+        selected = i == pred
+        selected_class = " selected" if selected else ""
+        selected_chip = "<span class='v36-selected-chip'>Dipilih</span>" if selected else ""
+        prob_html_parts.append(
+            f"<div class='v36-prob-card{selected_class}' style='border-color:{LEVEL_COLOR[i]};'>"
+            f"<div class='v36-prob-top'>"
+            f"<div class='v36-prob-label'>{LEVEL_TEXT[i]} {selected_chip}</div>"
+            f"<div style='font-weight:950;color:var(--on-surface);font-size:.82rem;'>{percentage:.2f}%</div>"
+            f"</div>"
+            f"<div class='v36-prob-track'>"
+            f"<div class='v36-prob-fill' style='width:{percentage:.1f}%;background:{LEVEL_COLOR[i]};'></div>"
+            f"</div>"
+            f"</div>"
+        )
+    prob_html = "".join(prob_html_parts)
+
+    return (
+        f"<div class='v36-modal-card'>"
+        f"<div class='v36-modal-top'>"
+        f"<div class='v36-modal-head'>"
+        f"<div class='v36-modal-icon'></div>"
+        f"<div>"
+        f"<div class='v36-modal-title'>Keputusan Klasifikasi Awal</div>"
+        f"<div class='v36-modal-desc'>Model Hibrid RF-DNN menggunakan markah peperiksaan dan profil pembelajaran anda untuk menetapkan aras permulaan kuiz adaptif.</div>"
+        f"</div>"
+        f"</div>"
+        f"<div class='v36-level-pill' style='background:{LEVEL_COLOR[pred]};color:{LEVEL_TEXT_ON_COLOR[pred]};'>"
+        f"<small>Aras Awal</small>"
+        f"<b>{LEVEL_TEXT[pred]}</b>"
+        f"<small>{confidence_pct:.2f}%</small>"
+        f"</div>"
+        f"</div>"
+        f"<div class='v36-quick-note'>{html.escape(short_note)}</div>"
+        f"<div class='v36-prob-title'>Pecahan keyakinan model</div>"
+        f"{prob_html}"
+        f"<div class='v36-modal-footer-note'>Aras ini ialah titik permulaan sahaja. Semasa kuiz, sistem akan melaras aras berdasarkan jawapan, masa dan bantuan Tutor Pintar.</div>"
+        f"</div>"
+    )
+
+def show_prediction_popup_if_needed():
+    if not st.session_state.get("profile_ready", False):
+        return
+
+    pred = int(st.session_state.predicted_level)
+    probs = st.session_state.get("prediction_probs", None)
+    if probs is None or len(probs) < 3:
+        probs = [0.0, 0.0, 0.0]
+        probs[pred] = float(st.session_state.get("confidence", 0.0) or 0.0)
+
+    if st.session_state.get("show_prediction_popup", False) and hasattr(st, "dialog"):
+        @st.dialog("Keputusan Klasifikasi Awal")
+        def _prediction_dialog():
+            st.markdown(build_prediction_result_html(pred, probs), unsafe_allow_html=True)
+
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Tutup", key="prediction_popup_close", use_container_width=True):
+                    st.session_state.show_prediction_popup = False
+                    st.rerun()
+            with c2:
+                if st.button("Terus ke Papan Pemuka", key="prediction_popup_dashboard", type="primary", use_container_width=True):
+                    st.session_state.show_prediction_popup = False
+                    go_to("Papan Pemuka")
+                    st.rerun()
+
+        _prediction_dialog()
+
+    elif st.session_state.get("show_prediction_popup", False):
+        st.markdown(build_prediction_result_html(pred, probs), unsafe_allow_html=True)
+        if st.button("Terus ke Papan Pemuka", key="prediction_inline_dashboard", type="primary", use_container_width=True):
+            st.session_state.show_prediction_popup = False
+            go_to("Papan Pemuka")
+            st.rerun()
+
+
 def page_login_profile():
     app_topbar("Profil & Kemasukan")
     left, right = st.columns([0.9, 1.1], gap="medium")
@@ -1843,20 +1508,13 @@ def page_login_profile():
         st.markdown("""
         <div class="v12-hero-premium">
             <div class="v12-hero-content">
-                <div class="v12-kicker">📘 Sistem pembelajaran adaptif untuk calon SPM</div>
                 <h1 class="v12-hero-title">Matematik Pintar SPM</h1>
-                <p class="v12-hero-desc">Belajar Matematik dengan laluan latihan yang berubah mengikut tahap penguasaan anda. Sistem ini menggabungkan ramalan Pembelajaran Mesin, kuiz adaptif, petunjuk pintar, pemasa masa nyata dan laporan prestasi dalam satu ruang pembelajaran yang moden.</p>
-                <div>
-                    <span class="v12-feature-chip">🧠 Ramalan Hibrid RF-DNN</span>
-                    <span class="v12-feature-chip">🎯 Kuiz adaptif</span>
-                    <span class="v12-feature-chip">💡 Petunjuk Pintar</span>
-                    <span class="v12-feature-chip">📊 Laporan prestasi</span>
-                </div>
+                <p class="v12-hero-desc">Maklumat profil di sebelah, termasuk markah peperiksaan matematik terakhir, digunakan oleh model Pembelajaran Mesin Hibrid RF-DNN untuk menetapkan tahap penguasaan awal pelajar — Rendah, Sederhana atau Tinggi. Tahap ini menjadi titik permulaan kuiz adaptif, yang seterusnya menyesuaikan aras soalan berdasarkan ketepatan jawapan, masa yang diambil dan penggunaan bantuan Tutor Pintar.</p>
                 <div class="v12-feature-grid">
-                    <div class="v12-feature-card"><b>Aras Pembelajaran</b><span>Sistem menentukan aras awal pelajar kepada Rendah, Sederhana atau Tinggi.</span></div>
-                    <div class="v12-feature-card"><b>Latihan Fleksibel</b><span>Pilih topik tertentu atau campuran semua topik dan tetapkan bilangan soalan.</span></div>
-                    <div class="v12-feature-card"><b>Tutor Pintar</b><span>Tutor memberi bimbingan tanpa mendedahkan jawapan akhir kuiz.</span></div>
-                    <div class="v12-feature-card"><b>Rekod Kemajuan</b><span>Jawapan, masa, bantuan dan prestasi disimpan untuk laporan pembelajaran.</span></div>
+                    <div class="v12-feature-card"><b>Klasifikasi Penguasaan</b><span>Model meramal aras awal pelajar daripada markah peperiksaan dan profil pembelajaran.</span></div>
+                    <div class="v12-feature-card"><b>Kuiz Adaptif</b><span>Aras soalan berubah mengikut prestasi semasa kuiz.</span></div>
+                    <div class="v12-feature-card"><b>Tutor Pintar</b><span>Bimbingan berpandu tanpa mendedahkan jawapan akhir.</span></div>
+                    <div class="v12-feature-card"><b>Rekod Pembelajaran</b><span>Jawapan, masa dan bantuan disimpan untuk laporan prestasi.</span></div>
                 </div>
             </div>
         </div>
@@ -1899,7 +1557,8 @@ def page_login_profile():
                         "Sangat kerap (5 hari seminggu)",
                     ],
                     index=3,
-                    help="Dipaparkan sebagai kekerapan supaya lebih mudah difahami pelajar. Sistem akan menukarnya kepada anggaran peratus untuk model."
+                    help="Dipaparkan sebagai kekerapan supaya lebih mudah difahami pelajar. " \
+                    "Sistem akan menukarnya kepada anggaran peratus untuk model."
                 )
                 attendance_map = {
                     "Sangat jarang (1 hari seminggu)": 20,
@@ -1925,7 +1584,8 @@ def page_login_profile():
                         "Sentiasa siap",
                     ],
                     index=1,
-                    help="Dipaparkan sebagai kekerapan supaya lebih mudah dijawab oleh pelajar. Sistem akan menukarnya kepada anggaran peratus untuk model."
+                    help="Dipaparkan sebagai kekerapan supaya lebih mudah dijawab oleh pelajar. " \
+                    "Sistem akan menukarnya kepada anggaran peratus untuk model."
                 )
                 assignment_map = {
                     "Jarang siap": 50,
@@ -1963,6 +1623,7 @@ def page_login_profile():
             st.session_state.predicted_level_text = text
             st.session_state.confidence = conf
             st.session_state.prediction_probs = probs
+            st.session_state.show_prediction_popup = True
             
             save_profile(st.session_state.user_id, profile, pred, text, conf)
             reset_quiz()
@@ -1973,61 +1634,51 @@ def page_login_profile():
 
         if st.session_state.profile_ready:
             pred = int(st.session_state.predicted_level)
-            insight = {
-                0: "Mulakan dengan soalan berpandu dan pengukuhan asas sebelum bergerak ke topik yang lebih mencabar.",
-                1: "Mulakan dengan soalan sederhana dan naikkan kesukaran apabila jawapan betul serta pantas.",
-                2: "Mulakan dengan soalan aras tinggi dan kekalkan cabaran melalui perkembangan adaptif.",
-            }.get(pred, "Laluan pembelajaran adaptif akan dilaraskan semasa kuiz.")
-
             probs = st.session_state.get("prediction_probs", None)
             if probs is None or len(probs) < 3:
                 probs = [0.0, 0.0, 0.0]
                 probs[pred] = float(st.session_state.confidence)
 
-            prob_html = ""
-            for i in [0, 1, 2]:
-                percentage = float(probs[i]) * 100
-                selected = i == pred
-                selected_text = "Dipilih" if selected else ""
-                border_style = f"2px solid {LEVEL_COLOR[i]}" if selected else "1px solid #bfdbfe"
-                bg_style = "linear-gradient(135deg, #eff6ff, #ecfeff)" if selected else "rgba(255,255,255,0.70)"
-                shadow_style = "0 8px 18px rgba(37,99,235,0.14)" if selected else "none"
-                prob_html += (
-                    f'<div style="padding:12px 14px; border-radius:18px; margin-bottom:10px; border:{border_style}; background:{bg_style}; box-shadow:{shadow_style};">'
-                    f'<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:7px;">'
-                    f'<div style="display:flex; align-items:center; gap:8px;">'
-                    f'<b style="color:#0f172a;">{LEVEL_TEXT[i]}</b>'
-                    f'<span style="font-size:11px; font-weight:900; color:#1d4ed8;">{selected_text}</span>'
-                    f'</div>'
-                    f'<span style="font-weight:900; color:{LEVEL_COLOR[i]};">{percentage:.2f}%</span>'
-                    f'</div>'
-                    f'<div class="v12-confidence-track">'
-                    f'<div class="v12-confidence-fill" style="width:{percentage:.1f}%; background:{LEVEL_COLOR[i]};"></div>'
-                    f'</div>'
-                    f'</div>'
-                )
-            
-            st.markdown(f'''
-            <div class="v12-smart-strip">
-                <div>
-                    <div class="v12-smart-title">Keputusan Klasifikasi Awal</div>
-                    <div class="v12-card-sub">{insight}</div>
-                </div>
-                <div style="min-width:270px;">
-                    <div style="margin-bottom:12px;">
-                        <span class="v12-level-badge" style="background:{LEVEL_COLOR[pred]};">{LEVEL_TEXT[pred]}</span>
+            confidence_pct = float(probs[pred]) * 100
+            insight = {
+                0: "Aras permulaan ditetapkan kepada Rendah.",
+                1: "Aras permulaan ditetapkan kepada Sederhana.",
+                2: "Aras permulaan ditetapkan kepada Tinggi.",
+            }.get(pred, "Aras permulaan telah ditetapkan.")
+
+            # Paparan kecil sahaja di halaman profil supaya pengguna tidak perlu scroll panjang.
+            # Keputusan penuh dipaparkan dalam popup/modal yang lebih kemas.
+            st.markdown(f"""
+            <div class="v36-mini-result">
+                <div class="v36-mini-left">
+                    <div class="v36-mini-icon"></div>
+                    <div>
+                        <div class="v36-mini-title">Klasifikasi awal berjaya dijana</div>
+                        <div class="v36-mini-sub">{insight}</div>
                     </div>
-                    <div class="mp-small" style="margin-bottom:10px; color:#1d4ed8; font-weight:900;">Pecahan keyakinan model</div>
-                    {prob_html}
                 </div>
+                <span class="v36-mini-badge" style="background:{LEVEL_COLOR[pred]};color:{LEVEL_TEXT_ON_COLOR[pred]};">
+                    {LEVEL_TEXT[pred]} · {confidence_pct:.2f}%
+                </span>
             </div>
-            ''', unsafe_allow_html=True)
-            
-            if st.button("Terus ke Papan Pemuka", type="primary", use_container_width=True):
-                go_to("Papan Pemuka")
+            """, unsafe_allow_html=True)
+
+            show_prediction_popup_if_needed()
+
+            col_result_1, col_result_2 = st.columns(2)
+            with col_result_1:
+                if st.button("Lihat Semula Keputusan", key="lihat_prediction_popup", use_container_width=True):
+                    st.session_state.show_prediction_popup = True
+                    st.rerun()
+            with col_result_2:
+                if st.button("Terus ke Papan Pemuka", key="profile_go_dashboard_after_prediction", type="primary", use_container_width=True):
+                    st.session_state.show_prediction_popup = False
+                    go_to("Papan Pemuka")
+                    st.rerun()
 
 def page_dashboard():
     app_topbar("Papan Pemuka")
+
     if not st.session_state.logged_in:
         st.warning("Sila log masuk di halaman Profil dahulu.")
         return
@@ -2047,46 +1698,58 @@ def page_dashboard():
 
     total_bank = len(questions_df)
     total_current_level = len(questions_df[questions_df["Difficulty"].astype(str) == current_level_text])
-    metrics = load_metrics()
-    metric_text = "Belum tersedia"
-    if metrics:
-        metric_text = f"{metrics.get('test', {}).get('accuracy', 0):.2%}"
+
+    try:
+        confidence_text = f"{float(st.session_state.confidence):.2%}"
+    except Exception:
+        confidence_text = "-"
+
+    model_accuracy_text = load_model_accuracy() or "-"
+
+    safe_name = html.escape(str(st.session_state.username).title())
+    safe_level = html.escape(str(current_level_text))
+    safe_level_label = html.escape(str(current_level_label))
 
     st.markdown(f"""
-    <div class="v12-dashboard-hero" style="margin-bottom:18px;">
-        <h2>Selamat Kembali, {st.session_state.username}! 👋</h2>
-        <p>{current_level_label} anda ialah <b>{current_level_text}</b>. Jika sebelum ini anda sudah menjawab kuiz, aras ini akan ikut aras akhir/adaptif terkini, bukan semata-mata ramalan awal profil.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown(f"""
-    <div class="v20-dashboard-wrap">
-        <div class="v20-learning-card">
-            <div class="v20-card-kicker">🎯 Laluan latihan adaptif</div>
-            <h2 class="v20-card-title">Pilih topik, sistem tentukan aras</h2>
-            <div class="v20-card-desc">Anda hanya perlu memilih topik dan bilangan soalan. Sistem akan mula daripada aras semasa pelajar, kemudian berubah secara adaptif semasa kuiz dijalankan.</div>
-            <div class="v20-flow">
-                <div class="v20-flow-step"><b>1. Profil</b><span>Model meramal aras awal berdasarkan data pelajar.</span></div>
-                <div class="v20-flow-step"><b>2. Kuiz</b><span>Soalan pertama mengikut aras semasa pelajar.</span></div>
-                <div class="v20-flow-step"><b>3. Adaptasi</b><span>Aras berubah ikut jawapan, masa dan bantuan.</span></div>
+    <div class="v43-welcome-hero">
+        <div class="v43-hero-inner">
+            <div>
+                <span class="v43-hero-kicker">Papan Pemuka Pembelajaran</span>
+                <h1 class="v43-hero-title">Selamat kembali, {safe_name}</h1>
+                <p class="v43-hero-copy">Pilih topik dan bilangan soalan. Sistem menggunakan aras semasa pelajar sebagai titik mula, kemudian menyesuaikan soalan seterusnya berdasarkan ketepatan jawapan, masa menjawab dan penggunaan Tutor Pintar.</p>
+            </div>
+            <div class="v43-hero-metrics">
+                <div class="v43-hero-metric"><small>Bank Soalan</small><b>{total_bank}</b></div>
+                <div class="v43-hero-metric"><small>Keyakinan Profil</small><b>{confidence_text}</b></div>
+                <div class="v43-hero-metric"><small>Ketepatan Model</small><b>{model_accuracy_text}</b></div>
             </div>
         </div>
-        <div class="v20-hero-mini">
-            <h3>Pusat Sistem</h3>
-            <p>Rekod pembelajaran disimpan untuk menghasilkan laporan prestasi dan sejarah latihan pelajar.</p>
-            <div class="v20-side-metric"><small>{current_level_label}</small><b>{current_level_text}</b></div>
-            <div class="v20-side-metric"><small>Jumlah bank soalan</small><b>{total_bank} soalan</b></div>
-            <div class="v20-side-metric"><small>Ketepatan model</small><b>{metric_text}</b></div>
+        <div class="v43-step-grid" style="margin-top:20px;">
+            <div class="v43-step"><div class="v43-step-num">1</div><b>Profil Dianalisis</b><span>Data profil pelajar disediakan untuk model Pembelajaran Mesin.</span></div>
+            <div class="v43-step"><div class="v43-step-num">2</div><b>Aras Awal Dikelaskan</b><span>Model menetapkan tahap penguasaan permulaan pelajar.</span></div>
+            <div class="v43-step"><div class="v43-step-num">3</div><b>Kuiz Bermula</b><span>Soalan pertama dipilih mengikut aras semasa pelajar.</span></div>
+            <div class="v43-step"><div class="v43-step-num">4</div><b>Sistem Menyesuaikan Aras</b><span>Aras berubah mengikut ketepatan, masa dan bantuan digunakan.</span></div>
+            <div class="v43-step"><div class="v43-step-num">5</div><b>Prestasi Direkod</b><span>Hasil kuiz disimpan untuk laporan dan rekod pembelajaran.</span></div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="v20-settings-title">Tetapan Sesi Kuiz</div><div class="v20-settings-sub">Pilih jenis latihan yang ingin dijawab. Sistem akan memaparkan jumlah soalan yang tersedia mengikut aras semasa pelajar.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="v43-dashboard-grid">', unsafe_allow_html=True)
+    left_col, right_col = st.columns([1.55, 0.75], gap="large")
 
-    col_a, col_b = st.columns([1.3, .7], gap="large")
-    with col_a:
-        selected_topic = st.selectbox("Pilihan latihan", topic_options, key="training_topic_select")
+    with left_col:
+        st.markdown("""
+        <div class="v43-setup-card">
+            <div class="v43-setup-intro">
+                <span class="v43-setup-kicker">Latihan Adaptif</span>
+                <h2 class="v43-setup-title">Pilih topik, sistem tentukan aras</h2>
+                <p class="v43-setup-sub">Anda hanya perlu memilih topik dan bilangan soalan. Sistem akan bermula daripada aras semasa pelajar, kemudian berubah secara adaptif semasa kuiz dijalankan.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="v43-control-title">Pilihan Latihan</div>', unsafe_allow_html=True)
+        selected_topic = st.selectbox("Pilihan latihan", topic_options, key="training_topic_select", label_visibility="collapsed")
+
         if selected_topic == "Campuran Semua Topik":
             topic_qs = questions_df.copy()
             nama_pilihan = "Semua topik"
@@ -2097,13 +1760,14 @@ def page_dashboard():
         level_qs = topic_qs[topic_qs["Difficulty"].astype(str) == current_level_text].copy()
         total_topic = len(topic_qs)
         total_level = len(level_qs)
+        safe_topic_name = html.escape(str(nama_pilihan))
 
         st.markdown(f"""
-        <div class="v20-summary-grid">
-            <div class="v20-summary-card"><small>Latihan dipilih</small><b>{nama_pilihan}</b></div>
-            <div class="v20-summary-card"><small>{current_level_label}</small><b>{current_level_text}</b></div>
-            <div class="v20-summary-card"><small>Soalan pada aras ini</small><b>{total_level}</b></div>
-        </div>
+            <div class="v43-stat-row">
+                <div class="v43-stat-box"><small>Latihan dipilih</small><b>{safe_topic_name}</b></div>
+                <div class="v43-stat-box"><small>{safe_level_label}</small><b>{safe_level}</b></div>
+                <div class="v43-stat-box"><small>Soalan aras ini</small><b>{total_level}</b></div>
+            </div>
         """, unsafe_allow_html=True)
 
         if total_level <= 0:
@@ -2115,26 +1779,26 @@ def page_dashboard():
         else:
             max_slider = min(20, total_level)
             default_n = min(5, max_slider)
-            question_count = st.slider("Bilangan soalan", min_value=1, max_value=max_slider, value=default_n, key="question_count_slider")
+            st.markdown('<div class="v43-control-title">Bilangan Soalan</div>', unsafe_allow_html=True)
+            question_count = st.slider("Bilangan soalan", min_value=1, max_value=max_slider, value=default_n, key="question_count_slider", label_visibility="collapsed")
 
         st.markdown(f"""
-        <div class="v20-adapt-note">
-            📌 Jumlah soalan dalam pilihan ini: <b>{total_topic}</b><br>
-            🎯 Soalan yang sepadan dengan aras semasa <b>{current_level_text}</b>: <b>{total_level}</b><br>
-            🔁 Selepas pelajar menjawab, sistem akan memilih soalan seterusnya berdasarkan aras adaptif terkini.
-        </div>
+            <div class="v43-summary-note">
+                <b>Ringkasan sesi</b><br>
+                Jumlah soalan dalam pilihan ini: <b>{total_topic}</b><br>
+                Soalan tersedia untuk aras <b>{safe_level}</b>: <b>{total_level}</b><br>
+                Selepas setiap jawapan, sistem memilih soalan seterusnya berdasarkan aras adaptif terkini.
+            </div>
         """, unsafe_allow_html=True)
 
-        if st.button("🚀 Mulakan Kuiz Adaptif", type="primary", use_container_width=True, disabled=(question_count == 0)):
+        if st.button("Mulakan Kuiz Adaptif", type="primary", use_container_width=True, disabled=(question_count == 0)):
             init_level = current_level_num
             base_pool = topic_qs.copy().reset_index(drop=True)
             pool_records = base_pool.to_dict(orient="records")
             first_question = pilih_soalan_adaptif(pool_records, init_level, [])
-
             if first_question is None:
                 st.error("Tiada soalan tersedia untuk pilihan ini.")
                 st.stop()
-
             st.session_state.quiz_questions = [first_question]
             st.session_state.question_pool = pool_records
             st.session_state.question_target_count = int(question_count)
@@ -2151,112 +1815,41 @@ def page_dashboard():
             st.session_state.session_id = create_quiz_session(st.session_state.user_id, init_level)
             go_to("Kuiz Adaptif")
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    with col_b:
+    with right_col:
+        avatar_initial = html.escape((str(st.session_state.username).strip()[:1] or "P").upper())
         st.markdown(f"""
-        <div class="v20-learning-card" style="padding:22px;">
-            <div class="v20-card-kicker">🧠 Status pembelajaran</div>
-            <h2 class="v20-card-title" style="font-size:1.35rem;">Ringkasan Pelajar</h2>
-            <div class="v20-summary-card" style="margin-bottom:10px;"><small>Nama pelajar</small><b>{st.session_state.username}</b></div>
-            <div class="v20-summary-card" style="margin-bottom:10px;"><small>Keyakinan model</small><b>{float(st.session_state.confidence):.2%}</b></div>
-            <div class="v20-summary-card"><small>Soalan aras semasa dalam bank</small><b>{total_current_level}</b></div>
+        <div class="v43-student-card">
+            <div class="v43-student-head">
+                <div class="v43-student-flex">
+                    <div class="v43-avatar">{avatar_initial}</div>
+                    <div><h3>Ringkasan Pelajar</h3><p>Status model dan adaptasi</p></div>
+                </div>
+            </div>
+            <div class="v43-current-level">
+                <span class="mp-glass-pill"><span class="mp-glass-item">Pelajar: <b>{safe_name}</b></span><span class="mp-glass-item">Aras: <b>{safe_level}</b></span></span>
+            </div>
+            <div class="v43-info-list">
+                <div class="v43-info-item"><span>Nama Pelajar</span><b>{safe_name}</b></div>
+                <div class="v43-info-item"><span>Keyakinan Profil</span><b>{confidence_text}</b></div>
+                <div class="v43-info-item"><span>Soalan Aras Ini</span><b>{total_current_level}</b></div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown('<div class="v20-actions">', unsafe_allow_html=True)
-        if st.button("📊 Laporan Prestasi", key="dashboard_go_report", use_container_width=True):
+        st.markdown('<div class="v43-side-actions">', unsafe_allow_html=True)
+        if st.button("Laporan Prestasi", key="dashboard_go_report", use_container_width=True):
             go_to("Laporan Prestasi")
-        if st.button("🗄️ Log Pangkalan Data", key="dashboard_go_database", use_container_width=True):
+            st.rerun()
+        if st.button("Rekod Pembelajaran", key="dashboard_go_database", use_container_width=True):
             go_to("Pangkalan Data")
+            st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def page_quiz():
     app_topbar("Kuiz Adaptif")
-
-    # Kemasan khusus halaman kuiz v27: tutor dalam satu panel kecil dan tidak melebihi baris butang hantar jawapan.
-    st.markdown("""
-    <style>
-    .v27-quiz-top{
-        background:rgba(255,255,255,.92);
-        border:1px solid rgba(191,219,254,.80);
-        border-radius:24px;
-        padding:15px 18px;
-        box-shadow:0 16px 36px rgba(37,99,235,.08);
-        margin-bottom:14px;
-    }
-    .v27-quiz-top-row{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
-    .v27-quiz-title{font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:950;color:#082f49;}
-    .v27-quiz-sub{font-size:.82rem;color:#64748b;font-weight:750;margin-top:2px;}
-    .v27-progress{height:8px;background:#dbeafe;border-radius:999px;overflow:hidden;margin-top:12px;}
-    .v27-progress-fill{height:100%;background:linear-gradient(90deg,#2563eb,#14b8a6);border-radius:999px;}
-    .v27-question-card{
-        background:rgba(255,255,255,.95);
-        border:1px solid rgba(191,219,254,.86);
-        border-radius:26px;
-        padding:22px 24px;
-        box-shadow:0 20px 48px rgba(37,99,235,.10);
-        margin:12px 0 14px 0;
-    }
-    .v27-question-title{font-size:1.15rem;font-weight:950;line-height:1.55;color:#0f172a;margin-bottom:16px;}
-    .v27-answer-note{border-top:1px solid #dbeafe;padding-top:13px;color:#1d4ed8;font-weight:900;font-size:.85rem;}
-    .v27-meta-wrap{margin-bottom:10px;}
-    div[data-testid="stRadio"] > div{width:100%;}
-    div[data-testid="stRadio"] label{
-        width:100% !important;
-        min-height:52px !important;
-        border-radius:16px !important;
-        border:1.4px solid #bfdbfe !important;
-        background:#ffffff !important;
-        padding:12px 15px !important;
-        margin-bottom:8px !important;
-        box-shadow:0 8px 18px rgba(37,99,235,.04) !important;
-    }
-    div[data-testid="stRadio"] label:hover{border-color:#14b8a6 !important;background:#f0fdfa !important;}
-    .v27-submit-gap{height:10px;}
-
-    /* Tutor panel: satu kotak yang kemas, tinggi terkawal, dan tidak memanjang ke bawah. */
-    .v27-tutor-shell{
-        background:rgba(255,255,255,.95);
-        border:1px solid rgba(191,219,254,.90);
-        border-radius:26px;
-        padding:18px 18px 16px 18px;
-        box-shadow:0 22px 52px rgba(37,99,235,.11);
-        margin-top:0;
-    }
-    .v27-tutor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
-    .v27-tutor-title{font-family:'Space Grotesk',sans-serif;font-size:1.18rem;font-weight:950;color:#082f49;}
-    .v27-status{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ecfdf5;color:#047857;border:1px solid #99f6e4;font-size:.72rem;font-weight:900;white-space:nowrap;}
-    .v27-status.warn{background:#fff7ed;color:#c2410c;border-color:#fed7aa;}
-    .v27-tutor-desc{background:#ecfdf5;border:1px solid #99f6e4;color:#0f766e;border-radius:16px;padding:11px 13px;font-weight:850;line-height:1.45;font-size:.84rem;margin-bottom:10px;}
-    .v27-chat-window{
-        height:175px;
-        max-height:175px;
-        overflow-y:auto;
-        background:linear-gradient(135deg,#f8fbff,#f0fdfa);
-        border:1px solid #dbeafe;
-        border-radius:18px;
-        padding:11px;
-        box-sizing:border-box;
-        margin:10px 0 12px 0;
-        scrollbar-width:thin;
-    }
-    .v27-chat-window::-webkit-scrollbar{width:7px;}
-    .v27-chat-window::-webkit-scrollbar-thumb{background:#93c5fd;border-radius:999px;}
-    .v27-msg{display:flex;gap:8px;margin-bottom:9px;align-items:flex-start;}
-    .v27-msg.user{justify-content:flex-end;}
-    .v27-avatar{width:28px;height:28px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 28px;}
-    .v27-avatar.bot{background:#f59e0b;color:#fff;}
-    .v27-avatar.user{background:#2563eb;color:#fff;order:2;}
-    .v27-bubble{max-width:82%;padding:9px 11px;border-radius:15px;font-size:.82rem;line-height:1.5;font-weight:650;}
-    .v27-bubble.bot{background:#fff;border:1px solid #bfdbfe;color:#0f172a;border-top-left-radius:5px;}
-    .v27-bubble.user{background:linear-gradient(135deg,#2563eb,#0f766e);color:#fff;border-top-right-radius:5px;}
-    .v27-form-title{font-size:.80rem;font-weight:900;color:#1e40af;margin:10px 0 7px 0;}
-    .v27-tutor-shell textarea{min-height:62px !important;}
-    .v27-feedback{border-radius:18px;padding:13px 14px;margin-top:14px;font-weight:760;line-height:1.5;}
-    .v27-feedback.ok{background:#ecfdf5;border:1px solid #99f6e4;color:#0f766e;}
-    .v27-feedback.warn{background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;}
-    @media(max-width:900px){.v27-chat-window{height:160px;max-height:160px;}.v27-question-card{padding:18px;}}
-    </style>
-    """, unsafe_allow_html=True)
 
     if not st.session_state.logged_in:
         st.warning("Sila log masuk dahulu.")
@@ -2289,7 +1882,7 @@ def page_quiz():
     if st.session_state.get("show_hint_popup", False):
         hint_text = st.session_state.get("current_hint_text", "Tiada petunjuk bertulis bagi soalan ini.")
         if hasattr(st, "dialog"):
-            @st.dialog("💡 Petunjuk Soalan")
+            @st.dialog("Petunjuk Soalan")
             def _hint_dialog():
                 st.markdown("**Gunakan petunjuk ini sebagai bimbingan awal.**")
                 st.info(hint_text)
@@ -2305,15 +1898,15 @@ def page_quiz():
                 st.rerun()
 
     st.markdown(f"""
-    <div class="v27-quiz-top">
-        <div class="v27-quiz-top-row">
+    <div class="v41-quiz-shell">
+        <div class="v41-quiz-row">
             <div>
-                <div class="v27-quiz-title">Kuiz Adaptif Matematik</div>
-                <div class="v27-quiz-sub">Pelajar: <b>{html.escape(str(st.session_state.username))}</b> &nbsp;•&nbsp; Aras semasa: <b>{level_text}</b></div>
+                <div class="v41-quiz-title">Kuiz Adaptif Matematik</div>
+                <div class="v41-quiz-sub"><span class="mp-glass-item">Pelajar: <b>{html.escape(str(st.session_state.username))}</b></span><span class="mp-glass-item">Aras semasa: <b>{level_text}</b></span></div>
             </div>
-            <span class="v12-section-pill">Soalan {idx + 1} / {total}</span>
+            <span class="v41-question-pill">Soalan {idx + 1} / {total}</span>
         </div>
-        <div class="v27-progress"><div class="v27-progress-fill" style="width:{progress_pct:.1f}%;"></div></div>
+        <div class="v41-progress-track"><div class="v41-progress-fill" style="width:{progress_pct:.1f}%;"></div></div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2350,7 +1943,7 @@ def page_quiz():
         )
 
         st.markdown('<div class="v27-submit-gap"></div>', unsafe_allow_html=True)
-        submit_btn = st.button("Hantar Jawapan ✔️", type="primary", use_container_width=True, key=f"submit_answer_{idx}")
+        submit_btn = st.button("Hantar Jawapan", type="primary", use_container_width=True, key=f"submit_answer_{idx}")
 
         if submit_btn:
             if user_choice is None:
@@ -2456,51 +2049,54 @@ def page_quiz():
 
     with right:
         api_status = '<span class="v27-status">API Bersambung</span>' if openai_is_configured() else '<span class="v27-status warn">Mod Sandaran</span>'
-        st.markdown(f"""
-        <div class="v27-tutor-shell">
+        with st.container(key="mp_tutor_panel", border=True):
+            st.markdown(f"""
             <div class="v27-tutor-head">
-                <div class="v27-tutor-title">🤖 Tutor Pintar</div>
+                <div class="v27-tutor-title">{TUTOR_MARK_SVG} Tutor Pintar</div>
                 {api_status}
             </div>
             <div class="v27-tutor-desc">
                 Saya boleh bantu beri petunjuk dan langkah permulaan tanpa mendedahkan jawapan akhir.
             </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
-        chat_items = list(st.session_state.chat_messages)
-        if not chat_items:
-            chat_items = [{"role": "assistant", "content": "Tanya bahagian yang anda kurang faham. Saya akan bantu secara ringkas."}]
+            chat_items = list(st.session_state.chat_messages)
+            if not chat_items:
+                chat_items = [{"role": "assistant", "content": "Tanya bahagian yang anda kurang faham. Saya akan bantu secara ringkas."}]
 
-        chat_rows = ""
-        for msg in chat_items:
-            role = msg.get("role", "assistant")
-            content = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
-            if role == "user":
-                chat_rows += f'<div class="v27-msg user"><div class="v27-bubble user">{content}</div><div class="v27-avatar user">👤</div></div>'
-            else:
-                chat_rows += f'<div class="v27-msg bot"><div class="v27-avatar bot">🤖</div><div class="v27-bubble bot">{content}</div></div>'
+            chat_rows = ""
+            for msg in chat_items:
+                role = msg.get("role", "assistant")
+                content = html.escape(str(msg.get("content", ""))).replace("\n", "<br>")
+                if role == "user":
+                    chat_rows += f'<div class="v27-msg user"><span class="v27-avatar user">Anda</span><div class="v27-bubble user">{content}</div></div>'
+                else:
+                    chat_rows += f'<div class="v27-msg bot"><span class="v27-avatar bot">{TUTOR_MARK_SVG} Tutor</span><div class="v27-bubble bot">{content}</div></div>'
 
-        st.markdown(f'<div class="v27-chat-window">{chat_rows}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="v27-chat-window">{chat_rows}</div>', unsafe_allow_html=True)
 
-        if st.button("💡 Petunjuk Soalan", use_container_width=True, key=f"hint_btn_{idx}"):
+            with st.form(f"borang_tutor_{idx}", clear_on_submit=True, border=False):
+                row_c1, row_c2 = st.columns([0.78, 0.22], gap="small")
+                with row_c1:
+                    student_msg = st.text_area(
+                        "Tanya Tutor Pintar",
+                        placeholder="Contoh: Saya tak faham formula yang perlu digunakan.",
+                        height=62,
+                        label_visibility="collapsed"
+                    )
+                with row_c2:
+                    with st.container(key="mp_send_btn_container"):
+                        ask_btn = st.form_submit_button("Hantar", type="primary", use_container_width=True)
+                with st.container(key="mp_hint_btn_container"):
+                    hint_btn = st.form_submit_button("Petunjuk", use_container_width=True)
+
+        if hint_btn:
             st.session_state.used_hint_current = True
             st.session_state.hint_count_current += 1
             st.session_state.hints_used += 1
             st.session_state.current_hint_text = str(q.get('Hint', 'Tiada petunjuk bertulis bagi soalan ini.'))
             st.session_state.show_hint_popup = True
             st.rerun()
-
-        st.markdown('<div class="v27-form-title">Tanya Tutor Pintar</div>', unsafe_allow_html=True)
-        with st.form(f"borang_tutor_{idx}", clear_on_submit=True):
-            student_msg = st.text_area(
-                "Tanya Tutor Pintar",
-                placeholder="Contoh: Saya tak faham formula yang perlu digunakan.",
-                height=62,
-                label_visibility="collapsed"
-            )
-            ask_btn = st.form_submit_button("Hantar kepada Tutor Pintar", use_container_width=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
         if ask_btn and student_msg.strip():
             st.session_state.chat_messages.append({"role": "user", "content": student_msg.strip()})
@@ -2517,29 +2113,37 @@ def page_quiz():
 def show_results():
     total_q = len(st.session_state.quiz_questions)
     accuracy = (st.session_state.correct_count / max(1, total_q)) * 100
+    final_level_text = LEVEL_TEXT[st.session_state.current_level]
     st.markdown(f"""
-    <div class="v24-results-wrap">
-        <div style="font-size:3rem;margin-bottom:8px;">🎉</div>
-        <h2 style="margin:0;color:#082f49;font-family:Space Grotesk, sans-serif;">Sesi Kuiz Selesai</h2>
-        <p class="mp-small" style="margin-top:8px;">Tahniah, anda telah melengkapkan sesi kuiz adaptif.</p>
-        <div class="v12-score-panel">
-            <div class="score">{float(st.session_state.score):.1f}</div>
-            <div style="font-size:0.85rem; letter-spacing:1px; color:#fdf2f8; margin-top:4px; font-weight:700;">JUMLAH SKOR</div>
+    <div class="v41-result-wrap">
+        <h2>Sesi Kuiz Selesai</h2>
+        <p>Prestasi sesi ini telah disimpan dan aras adaptif pelajar telah dikemas kini.</p>
+        <div class="v41-score-ring">
+            <div class="v41-score-inner">
+                <div class="v41-score-value">{float(st.session_state.score):.1f}</div>
+                <div class="v41-score-label">Jumlah Skor</div>
+            </div>
         </div>
-        <div class="v12-result-stats">
-            <div class="v12-result-stat"><b>{st.session_state.correct_count} / {total_q}</b><span>Jawapan Betul</span></div>
-            <div class="v12-result-stat"><b>{accuracy:.0f}%</b><span>Ketepatan</span></div>
-            <div class="v12-result-stat"><b>{LEVEL_TEXT[st.session_state.current_level]}</b><span>Aras Akhir</span></div>
+        <div class="v41-result-grid">
+            <div class="v41-result-card"><b>{st.session_state.correct_count} / {total_q}</b><span>Jawapan Betul</span></div>
+            <div class="v41-result-card"><b>{accuracy:.0f}%</b><span>Ketepatan</span></div>
+            <div class="v41-result-card"><b>{final_level_text}</b><span>Aras Akhir</span></div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("Mula Sesi Baharu 🔄", type="primary", use_container_width=True):
+    if st.button("Mula Sesi Baharu", type="primary", use_container_width=True):
         reset_quiz()
         go_to("Papan Pemuka")
         st.rerun()
 
+
+def render_table(df):
+    """Papar DataFrame sebagai jadual HTML bergaya tema sistem (label dan data kekal sama)."""
+    st.markdown(
+        f'<div class="mp-table-wrap">{df.to_html(classes="mp-table", index=False, escape=True, border=0)}</div>',
+        unsafe_allow_html=True
+    )
 
 def page_performance():
     app_topbar("Laporan Prestasi")
@@ -2581,8 +2185,8 @@ def page_performance():
         <h2>Laporan Prestasi Pembelajaran</h2>
         <p>Bahagian ini memaparkan ringkasan pencapaian kuiz, penggunaan bantuan Tutor Pintar, masa menjawab dan perkembangan aras adaptif pelajar.</p>
         <div style="margin-top:14px;">
-            <span class="v24-soft-pill" style="background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#fff;">Sesi selesai: {len(df)}</span>
-            <span class="v24-soft-pill" style="background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#fff;">Aras terkini: {html.escape(str(df.iloc[-1]['final_level_text']))}</span>
+            <span class="v24-soft-pill">Sesi Selesai: {len(df)}</span>
+            <span class="v24-soft-pill">Aras Terkini: {html.escape(str(df.iloc[-1]['final_level_text']))}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2605,14 +2209,28 @@ def page_performance():
         </div>
         """, unsafe_allow_html=True)
         fig, ax = plt.subplots(figsize=(8.5, 4.2))
-        x_values = range(1, len(df) + 1)
-        ax.plot(x_values, df["percent"], marker="o", linewidth=2.8, label="Ketepatan (%)")
-        ax.axhline(avg_percent, linestyle="--", alpha=0.65, label="Purata")
-        ax.set_xlabel("Sesi Latihan")
-        ax.set_ylabel("Ketepatan (%)")
+        fig.patch.set_facecolor("#FFFFFF")
+        ax.set_facecolor("#FFFFFF")
+        x_values = list(range(1, len(df) + 1))
+        y_values = df["percent"].tolist()
+        ax.fill_between(x_values, y_values, 0, color="#1A56DB", alpha=0.08, zorder=1)
+        ax.plot(x_values, y_values, marker="o", linewidth=2.4, color="#1A56DB",
+                markersize=6, markerfacecolor="#F2994A", markeredgecolor="#FFFFFF",
+                markeredgewidth=1.4, label="Ketepatan (%)", zorder=3)
+        ax.axhline(avg_percent, linestyle="--", linewidth=1.3, color="#F2994A", alpha=0.85,
+                   label=f"Purata ({avg_percent:.0f}%)", zorder=2)
+        ax.set_xlabel("Sesi Latihan", fontsize=10, color="#4A5578")
+        ax.set_ylabel("Ketepatan (%)", fontsize=10, color="#4A5578")
         ax.set_ylim(0, 105)
-        ax.grid(True, alpha=0.18)
-        ax.legend()
+        ax.set_xticks(x_values)
+        ax.tick_params(colors="#4A5578", labelsize=9)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_color("#C6D2EE")
+        ax.spines["bottom"].set_color("#C6D2EE")
+        ax.set_axisbelow(True)
+        ax.grid(axis="y", color="#C6D2EE", linewidth=0.8, alpha=0.8)
+        ax.legend(frameon=False, fontsize=9, labelcolor="#4A5578")
         st.pyplot(fig)
 
         if not ans_df.empty:
@@ -2630,16 +2248,16 @@ def page_performance():
             topic_summary["Ketepatan (%)"] = (topic_summary["Betul"] / topic_summary["Bil_Soalan"] * 100).round(1)
             topic_summary["Purata_Masa"] = topic_summary["Purata_Masa"].round(1)
             topic_summary = topic_summary.rename(columns={"topic": "Topik", "Purata_Masa": "Purata Masa (s)"})
-            st.dataframe(topic_summary, use_container_width=True, hide_index=True)
+            render_table(topic_summary)
 
     with right:
         st.markdown(f"""
         <div class="v24-section-card">
             <h3>Ringkasan Pembelajaran</h3>
             <p>Maklumat ringkas sesi terkini dan corak penggunaan sistem.</p>
-            <span class="v24-soft-pill">⏱️ Jumlah masa: {total_time/60:.1f} min</span>
-            <span class="v24-soft-pill">⚡ Purata masa: {avg_time:.1f}s</span>
-            <span class="v24-soft-pill">🎯 Aras akhir: {html.escape(str(df.iloc[-1]['final_level_text']))}</span>
+            <span class="v24-soft-pill">Jumlah Masa: {total_time/60:.1f} min</span>
+            <span class="v24-soft-pill">Purata Masa: {avg_time:.1f}s</span>
+            <span class="v24-soft-pill">Aras Akhir: {html.escape(str(df.iloc[-1]['final_level_text']))}</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -2647,27 +2265,37 @@ def page_performance():
         display_df["completed_at"] = display_df["completed_at"].dt.strftime("%d/%m/%Y %H:%M")
         display_df["percent"] = display_df["percent"].round(1)
         display_df.columns = ["Tarikh", "Aras Awal", "Aras Akhir", "Betul", "Jumlah", "Bantuan", "Ketepatan (%)"]
-        st.markdown("### Senarai Sesi")
-        st.dataframe(display_df.sort_values("Tarikh", ascending=False), use_container_width=True, hide_index=True)
+        st.markdown("##### Senarai Sesi")
+        render_table(display_df.sort_values("Tarikh", ascending=False))
 
-        fsrs_progress = fetch_fsrs_progress(st.session_state.user_id)
-        if fsrs_progress:
-            fsrs_df = pd.DataFrame(fsrs_progress)
-            if not fsrs_df.empty:
-                fsrs_df["current_level"] = fsrs_df["current_level"].map(LEVEL_TEXT)
-                fsrs_show = fsrs_df[["topic", "current_level", "review_count", "latest_grade"]].copy()
-                fsrs_show.columns = ["Topik", "Aras Semasa", "Bil. Ulang Kaji", "Gred Terkini"]
-                st.markdown("### Kemajuan Adaptif Topik")
-                st.dataframe(fsrs_show, use_container_width=True, hide_index=True)
+    fsrs_progress = fetch_fsrs_progress(st.session_state.user_id)
+    if fsrs_progress:
+        fsrs_df = pd.DataFrame(fsrs_progress)
+        if not fsrs_df.empty:
+            fsrs_df["current_level"] = fsrs_df["current_level"].map(LEVEL_TEXT)
+            fsrs_show = fsrs_df[["topic", "current_level", "review_count", "latest_grade"]].copy()
+            fsrs_show.columns = ["Topik", "Aras Semasa", "Bil. Ulang Kaji", "Gred Terkini"]
+            st.markdown("""
+            <div class="v24-section-card">
+                <h3>Kemajuan Adaptif Topik</h3>
+                <p>Aras semasa dan bilangan ulang kaji bagi setiap topik berdasarkan sistem pengulangan adaptif.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            render_table(fsrs_show)
 
 def page_database():
-    app_topbar("Pangkalan Data")
+    app_topbar("Rekod Pembelajaran")
     if not st.session_state.logged_in:
         st.warning("Sila log masuk dahulu.")
         return
-        
-    st.markdown("### Semakan Log SQLite Sistem Pembelajaran Adaptif")
-    st.markdown('<p class="mp-small">Semua data profil pelajar, transaksi jawapan kuiz, perbualan Tutor Pintar, dan rekod adaptasi topik disimpan secara selamat dalam SQLite.</p>', unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="v40-panel" style="margin:16px 0 18px 0;">
+        <span class="v40-section-kicker">Rekod Pembelajaran</span>
+        <h2 class="v40-panel-title" style="margin-top:14px;">Rekod Pembelajaran Pelajar</h2>
+        <p class="v40-panel-sub">Bahagian ini memaparkan profil pelajar, sesi kuiz, jawapan, bimbingan Tutor Pintar dan kemajuan adaptif yang disimpan oleh sistem sebagai rekod pembelajaran.</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     def tukar_label_melayu(df_in):
         peta = {
@@ -2693,34 +2321,41 @@ def page_database():
 
     try:
         conn = sqlite3.connect("adaptive_math.db")
-        
-        st.markdown("#### 1. Jadual Pengguna (`users`)")
-        u = pd.read_sql_query("SELECT * FROM users", conn)
+        uid = st.session_state.user_id
+
+        st.markdown("##### Profil Pengguna")
+        u = pd.read_sql_query("SELECT * FROM users WHERE id = ?", conn, params=(uid,))
         st.dataframe(tukar_label_melayu(u), use_container_width=True)
-        
-        st.markdown("#### 2. Jadual Profil Pelajar (`profiles`)")
-        sp = pd.read_sql_query("SELECT * FROM profiles", conn)
+
+        st.markdown("##### Profil Pembelajaran")
+        sp = pd.read_sql_query("SELECT * FROM profiles WHERE user_id = ?", conn, params=(uid,))
         st.dataframe(tukar_label_melayu(sp), use_container_width=True)
-        
-        st.markdown("#### 3. Jadual Sesi Kuiz (`quiz_sessions`)")
-        qs = pd.read_sql_query("SELECT * FROM quiz_sessions", conn)
+
+        st.markdown("##### Sesi Kuiz")
+        qs = pd.read_sql_query("SELECT * FROM quiz_sessions WHERE user_id = ?", conn, params=(uid,))
         st.dataframe(tukar_label_melayu(qs), use_container_width=True)
-        
-        st.markdown("#### 4. Jadual Log Jawapan Pelajar (`quiz_answers`)")
-        sa = pd.read_sql_query("SELECT * FROM quiz_answers", conn)
+
+        st.markdown("##### Rekod Jawapan")
+        sa = pd.read_sql_query(
+            "SELECT qa.* FROM quiz_answers qa JOIN quiz_sessions qs ON qa.session_id = qs.id WHERE qs.user_id = ?",
+            conn, params=(uid,)
+        )
         st.dataframe(tukar_label_melayu(sa), use_container_width=True)
-        
-        st.markdown("#### 5. Jadual Transaksi Sembang Tutor Pintar (`chat_logs`)")
-        cl = pd.read_sql_query("SELECT * FROM chat_logs", conn)
+
+        st.markdown("##### Log Bimbingan Tutor Pintar")
+        cl = pd.read_sql_query(
+            "SELECT cl.* FROM chat_logs cl JOIN quiz_sessions qs ON cl.session_id = qs.id WHERE qs.user_id = ?",
+            conn, params=(uid,)
+        )
         st.dataframe(tukar_label_melayu(cl), use_container_width=True)
-        
-        st.markdown("#### 6. Jadual Kemajuan Adaptasi Topik (`fsrs_progress`)")
-        fs = pd.read_sql_query("SELECT * FROM fsrs_progress", conn)
+
+        st.markdown("##### Kemajuan Adaptif Topik")
+        fs = pd.read_sql_query("SELECT * FROM fsrs_progress WHERE user_id = ?", conn, params=(uid,))
         st.dataframe(tukar_label_melayu(fs), use_container_width=True)
-        
+
         conn.close()
     except Exception as e:
-        st.error(f"Gagal membaca log pangkalan data SQLite: {e}")
+        st.error(f"Gagal membaca rekod pembelajaran: {e}")
 
 # ------------------------------------------------------------
 # Titik Mula Pelaksanaan
@@ -2739,6 +2374,7 @@ def main():
         page_performance()
     elif page == "Pangkalan Data":
         page_database()
+    app_footer()
 
 if __name__ == "__main__":
     main()

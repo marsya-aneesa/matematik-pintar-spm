@@ -4,3 +4,4 @@ __pycache__/
 adaptive_math.db
 *.db-journal
 .streamlit/secrets.toml
+desktop.ini

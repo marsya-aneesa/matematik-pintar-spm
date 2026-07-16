@@ -1,0 +1,140 @@
+[
+  {
+    "test_row": 8,
+    "predicted": "Rendah",
+    "top_features": [
+      {
+        "feature": "RF_prob_Rendah",
+        "value": 0.7780557565616533,
+        "shap_value": 0.2472438599766124
+      },
+      {
+        "feature": "cat__ExamBand_3",
+        "value": 0.0,
+        "shap_value": 0.14535832984318148
+      },
+      {
+        "feature": "cat__ExamBand_1",
+        "value": 1.0,
+        "shap_value": 0.14076588633480808
+      },
+      {
+        "feature": "RF_prob_Sederhana",
+        "value": 0.20883065481953184,
+        "shap_value": 0.08493918320196436
+      },
+      {
+        "feature": "num__OnlineCourses",
+        "value": -1.2920115685042866,
+        "shap_value": -0.05195031014894802
+      },
+      {
+        "feature": "cat__Resources_0",
+        "value": 1.0,
+        "shap_value": 0.035515724884015464
+      },
+      {
+        "feature": "cat__LearningStyle_2",
+        "value": 0.0,
+        "shap_value": 0.021813008900681687
+      },
+      {
+        "feature": "cat__ExamBand_2",
+        "value": 0.0,
+        "shap_value": 0.0070245362416151355
+      }
+    ]
+  },
+  {
+    "test_row": 0,
+    "predicted": "Sederhana",
+    "top_features": [
+      {
+        "feature": "RF_prob_Sederhana",
+        "value": 0.9623785933190265,
+        "shap_value": 0.2034137175238132
+      },
+      {
+        "feature": "RF_prob_Tinggi",
+        "value": 0.011187525571824406,
+        "shap_value": 0.14289216908028723
+      },
+      {
+        "feature": "cat__ExamBand_3",
+        "value": 0.0,
+        "shap_value": 0.08506068518319505
+      },
+      {
+        "feature": "cat__ExamBand_2",
+        "value": 1.0,
+        "shap_value": 0.06544234126187239
+      },
+      {
+        "feature": "RF_prob_Rendah",
+        "value": 0.026433881109148873,
+        "shap_value": 0.06101001866997516
+      },
+      {
+        "feature": "cat__ExamBand_1",
+        "value": 0.0,
+        "shap_value": 0.05611479473056801
+      },
+      {
+        "feature": "cat__StressLevel_1",
+        "value": 1.0,
+        "shap_value": 0.027189945256953747
+      },
+      {
+        "feature": "cat__LearningStyle_2",
+        "value": 0.0,
+        "shap_value": 0.024808112879036382
+      }
+    ]
+  },
+  {
+    "test_row": 1,
+    "predicted": "Tinggi",
+    "top_features": [
+      {
+        "feature": "RF_prob_Tinggi",
+        "value": 0.8396087627411248,
+        "shap_value": 0.22293502816124766
+      },
+      {
+        "feature": "cat__ExamBand_3",
+        "value": 1.0,
+        "shap_value": 0.14374183058268547
+      },
+      {
+        "feature": "cat__Discussions_1",
+        "value": 0.0,
+        "shap_value": -0.04297770942138379
+      },
+      {
+        "feature": "cat__ExamBand_1",
+        "value": 0.0,
+        "shap_value": 0.03922602212223228
+      },
+      {
+        "feature": "cat__Resources_1",
+        "value": 0.0,
+        "shap_value": 0.03721309143936531
+      },
+      {
+        "feature": "RF_prob_Sederhana",
+        "value": 0.14420619746962313,
+        "shap_value": 0.035994302633655884
+      },
+      {
+        "feature": "cat__Gender_0",
+        "value": 0.0,
+        "shap_value": -0.03353706010682367
+      },
+      {
+        "feature": "RF_prob_Rendah",
+        "value": 0.016185039789252127,
+        "shap_value": 0.022299954312442388
+      }
+    ]
+  }
+]
